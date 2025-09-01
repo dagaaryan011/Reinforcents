@@ -35,7 +35,7 @@ high_price = st.session_state.high_price
 low_price = st.session_state.low_price
 
 # --- Title ---
-st.title("📈 Reliance")
+st.title("₹₹₹ Reliance₹₹₹")
 
 col1, col2 = st.columns([65, 35])
 
@@ -43,7 +43,7 @@ col1, col2 = st.columns([65, 35])
 # The graph is now plotted once using all sample data
 with col1:
   
-    st.subheader("📊 Market Depth Chart")
+    st.subheader(" ↹ Market Depth Chart ↹   ")
 
     # 1. Get the current bid and ask data from the order book
     bids = ob.get_bids()
@@ -95,12 +95,12 @@ with col1:
 # RIGHT → Order book
 # This section will automatically update on a form submission
 with col2:
-    st.subheader("📑 Order Book")
+    st.subheader("⟪ Order Book ⟫")
 
     buy_col, sell_col = st.columns(2)
 
     with buy_col:
-        st.markdown("### 🟢 Buy Orders")
+        st.markdown("### 💰 Buy Orders")
         bids = ob.get_bids()
         if bids:
             bids_df = pd.DataFrame(bids, columns=["Price", "Size"])
@@ -111,7 +111,7 @@ with col2:
             st.write("No BUY orders")
 
     with sell_col:
-        st.markdown("### 🔴 Sell Orders")
+        st.markdown("### 🪙 Sell Orders")
         asks = ob.get_asks()
         if asks:
             asks_df = pd.DataFrame(asks, columns=["Price", "Size"])
