@@ -299,4 +299,63 @@ if __name__ == '__main__':
 
 
 
+    step function
+    def step(self, raw_action):
+        self.current_step += 1
+        if self.current_step >= len(self.daily_price_path):
+            return self.get_state(), 0, True
+
+        new_underlying_price = self.daily_price_path[0]
+        self.market.update_market(new_underlying_price)
+        self._update_active_tickers()
+
+        old_portfolio_value = self.calculate_portfolio_value()
+        
+        
+        ticker_probabilities = raw_action[:self.n_tickers]
+        size_and_direction = raw_action[self.n_tickers]
+        chosen_ticker_index = np.argmax(ticker_probabilities)
+        ticker_to_trade = self.active_tickers[chosen_ticker_index]
+        side = Side.BUY if size_and_direction > 0 else Side.SELL
+        requested_size = 10 
+        
+        trade_size = requested_size
+        if side == Side.SELL:
+            current_holding = self.portfolio.get(ticker_to_trade, 0)
+            trade_size = min(requested_size, current_holding)
+        
+       
+       
+        if trade_size > 0:
+            target_book = self.market.get_book(ticker_to_trade)
+            if target_book:
+                bids = target_book.get_bids()
+                asks = target_book.get_asks()
+                price = -1
+                if side == Side.BUY and asks: price = asks[0][0]
+                elif side == Side.SELL and bids: price = bids[0][0]
+
+                if price != -1:
+                    order = Order(side=side, price=price, size=trade_size, owner_id='AGENT_01')
+                    executed_trades = target_book.add_order(order)
+                    for trade in executed_trades:
+                        cost = trade.price * trade.size
+                        if trade.taker_side == Side.BUY:
+                            self.cash_balance -= cost
+                            self.portfolio[trade.ticker_id] += trade.size
+                        else:
+                            self.cash_balance += cost
+                            self.portfolio[trade.ticker_id] -= trade.size
+        
+        
+
+        new_portfolio_value = self.calculate_portfolio_value()
+        reward = new_portfolio_value - old_portfolio_value-new_portfolio_value*0.003
+        next_state = self.get_state()
+        
+        end_of_day = self.current_step >= len(self.daily_price_path) - 1
+        is_bankrupt = new_portfolio_value < (self.initial_cash * 0.5)
+        done = end_of_day or is_bankrupt
+
+        return next_state, reward, done
     

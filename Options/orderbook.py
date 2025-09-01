@@ -224,7 +224,7 @@ class OrderBook:
         order.price = self._round_to_tick(order.price)
         if not self._is_price_acceptable(order.price):
             return executed_trades
-        
+        print(f"  -> BOOK ({self.ticker_id}): Received an order -> {order}")
         order.order_id = self._new_order_id()
         executed_trades = self._process_order(order)
         self._maintain_book_depth()
@@ -309,6 +309,7 @@ class OrderBook:
             
             trade_size = min(incoming_order.size, book_order.size)
             new_trade = Trade(self.ticker_id, book_order.price, trade_size, incoming_order, book_order)
+            print(f"    ==> TRADE EXECUTED in {self.ticker_id}: Size {new_trade.size} @ {new_trade.price}")
             self.ledger.record_trade(new_trade)
             trades_at_level.append(new_trade)
             

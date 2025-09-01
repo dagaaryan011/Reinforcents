@@ -55,33 +55,51 @@ class TradingEnvironment:
         self.market = MarketExchange(underlying_price=opening_price)
         self._update_active_tickers()
         return self.get_state()
-
     def step(self, raw_action):
+    # 1. Check mailbox for notifications about resting orders (maker trades)
+        for ticker_name in self.active_tickers:
+            book = self.market.get_book(ticker_name)
+            if book:
+                notifications = book.collect_notifications_for('AGENT_01')
+                if notifications:
+                    for trade in notifications:
+                        cost = trade.price * trade.size
+                        if trade.maker_side == Side.BUY:
+                            self.cash_balance -= cost
+                            self.portfolio[trade.ticker_id] += trade.size
+                        else: # The maker was a seller
+                            self.cash_balance += cost
+                            self.portfolio[trade.ticker_id] -= trade.size
+
+        # 2. Advance time and update the entire market
         self.current_step += 1
         if self.current_step >= len(self.daily_price_path):
-            return self.get_state(), 0, True
+            return self.get_state(), 0, True # End of day
 
         new_underlying_price = self.daily_price_path[0]
         self.market.update_market(new_underlying_price)
         self._update_active_tickers()
 
         old_portfolio_value = self.calculate_portfolio_value()
-        
-        
+
+        # 3. Interpret the agent's action (taker trade)
         ticker_probabilities = raw_action[:self.n_tickers]
         size_and_direction = raw_action[self.n_tickers]
+        
         chosen_ticker_index = np.argmax(ticker_probabilities)
         ticker_to_trade = self.active_tickers[chosen_ticker_index]
-        side = Side.BUY if size_and_direction > 0 else Side.SELL
-        requested_size = 10 
         
+        side = Side.BUY if size_and_direction > 0 else Side.SELL
+        print(f"[Step {self.current_step}] ENV: Agent chose to {side.name} {ticker_to_trade}.")
+        requested_size = 10 # Using a fixed size for simplicity for now
+
+        # 4. Enforce the "No Short Selling" rule
         trade_size = requested_size
         if side == Side.SELL:
             current_holding = self.portfolio.get(ticker_to_trade, 0)
             trade_size = min(requested_size, current_holding)
-        
-       
-       
+
+        # 5. Execute the trade and process the instant receipt
         if trade_size > 0:
             target_book = self.market.get_book(ticker_to_trade)
             if target_book:
@@ -94,6 +112,7 @@ class TradingEnvironment:
                 if price != -1:
                     order = Order(side=side, price=price, size=trade_size, owner_id='AGENT_01')
                     executed_trades = target_book.add_order(order)
+                    
                     for trade in executed_trades:
                         cost = trade.price * trade.size
                         if trade.taker_side == Side.BUY:
@@ -103,10 +122,9 @@ class TradingEnvironment:
                             self.cash_balance += cost
                             self.portfolio[trade.ticker_id] -= trade.size
         
-        
-
+        # 6. Calculate reward, next state, and done flag
         new_portfolio_value = self.calculate_portfolio_value()
-        reward = new_portfolio_value - old_portfolio_value-new_portfolio_value*0.003
+        reward = new_portfolio_value - old_portfolio_value
         next_state = self.get_state()
         
         end_of_day = self.current_step >= len(self.daily_price_path) - 1
