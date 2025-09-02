@@ -8,7 +8,8 @@ from tensorflow.keras.optimizers import Adam
 #from buffer import ReplayBuffer
 from networks import spreadActorNetwork, spreadCriticNetwork, spreadValueNetwork
 from exchange import MarketExchange
-from orderbook import Order, Trade, Side
+from orderbook import Order, Trade, Side, OrderBook
+from environment import Env
 
 class Agent:
     def __init__(self):
@@ -18,7 +19,9 @@ class Agent:
         self.critic_1 = spreadCriticNetwork()
         self.critic_2 = spreadCriticNetwork()
         self.actor = spreadActorNetwork()
-        self.exchange = MarketExchange()
+        self.env = Env()
+        # self.exchange = MarketExchange()
+        # self.orderbook = OrderBook()
         self.value.optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
         self.target_value.optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
         self.critic_1.optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
@@ -27,162 +30,108 @@ class Agent:
         self.capital = 10000000
         self.size = 1000
         self.tau = 0.5
+        self.states = [0] * 2000
+        self.actions = [0] * 2000
+        self.log_probs = [0] * 2000
+        self.rewards = [0] * 2000
+        self.new_states = [0] * 2000
+        self.t = 0
 
-    def collect(self, price):
+    def collect(self):
 
-        self.states = []
-        self.actions = []
-        self.log_probs = []
-        self.rewards = []
-        self.new_states = []
-        for i in range(0,1000):
-            state = []
-            # 2. Filter to just the option tickers (exclude the underlying)
-            option_ticker_names = [ticker for ticker in self.exchange.market_books if ticker != 'STOCK_UNDERLYING']
-            # 3. Pick one randomly
-            random_ticker = random.choice(option_ticker_names)
+        i = self.t % 2000
 
-            # 4. Get the order book
-            self.orderbook = self.exchange.get_book(random_ticker)
+        state = []
+        ob = self.env.get_orderbook()
+        highest_bid, lowest_ask = self.env.get_highestbid_lowestask(ob, self.agent_id)
 
-            bids = self.orderbook.get_bids(self.agent_id)
-            asks = self.orderbook.get_asks(self.agent_id)
+        volatility = np.random.uniform(low=0.01, high=0.05)
 
-            highest_bid = bids[0][0] if bids else print("no bids") #None
-            lowest_ask = asks[0][0] if asks else print("no asks") #None
+        # ticker_parts = random_ticker.split('_')
+        # strike_price = int(ticker_parts[1]) if len(ticker_parts) == 3 else print("no strike") #None
+        # spot_price = self.exchange.underlying_price
 
-            volatility = np.random.uniform(low=0.01, high=0.05)
+        # bs = BlaScho()
+        # bs.Strike = strike_price
+        # bs.Spot = spot_price
+        # bs.Volatility =
+        # if "CE" in random_ticker:
+        #     option_type = "call"
+        # elif "PE" in random_ticker:
+        #     option_type = "put"
+        # else:
+        #     option_type = "UNDERLYING"
 
-            # ticker_parts = random_ticker.split('_')
-            # strike_price = int(ticker_parts[1]) if len(ticker_parts) == 3 else print("no strike") #None
-            # spot_price = self.exchange.underlying_price
+        state.append(highest_bid)
+        state.append(lowest_ask)
+        state.append(lowest_ask - highest_bid)
+        state.append((lowest_ask + highest_bid)/2)
+        state.append(self.capital)
+        state.append(self.size)
+        #state.append(volatility)
 
-            # bs = BlaScho()
-            # bs.Strike = strike_price
-            # bs.Spot = spot_price
-            # bs.Volatility =
-            # if "CE" in random_ticker:
-            #     option_type = "call"
-            # elif "PE" in random_ticker:
-            #     option_type = "put"
-            # else:
-            #     option_type = "UNDERLYING"
+    
+        self.states[i] = state
+        
+        action, logprob = self.do_action(state)
+        
+        self.actions[i] = action
+        self.log_probs[i] = logprob
+        
 
-
-            state.append(highest_bid)
-            state.append(lowest_ask)
-            state.append(lowest_ask - highest_bid)
-            state.append((lowest_ask + highest_bid)/2)
-            state.append(self.capital)
-            state.append(self.size)
-            #state.append(volatility)
-
-            self.states.append(state)
-            # tfstate = tf.convert_to_tensor(state, dtype=tf.float32)
-            # action, logprob = self.actor.sample_normal(tfstate, reparameterize=False)
-
-            # tfstate = tf.convert_to_tensor(state, dtype=tf.float32)
-            # tfstate = tf.expand_dims(tfstate, axis=0)  # Reshape to (1, 5)
-
-            # Convert state to a 2D tensor
-            tfstate = tf.convert_to_tensor(state, dtype=tf.float32)
-            #print(f"Before reshape, state shape: {tfstate.shape}")
-
-            # Reshape to (1, 5)
-            tfstate = tf.expand_dims(tfstate, axis=0)  # This should result in shape (1, 5)
-            #print(f"After reshape, state shape: {tfstate.shape}")
-
-            # Now pass the reshaped state to the actor network
-            action, logprob = self.actor.sample_normal(tfstate, reparameterize=False)
-
-            #print("got action")
-            self.actions.append(action)
-            self.log_probs.append(logprob)
-            #print(tf.squeeze(action))
-            #print(logprob)
-            #print("actions, logprobs appended")
+        bid_price, ask_price, bid_size, ask_size = self.decide_prices_sizes(action, highest_bid, lowest_ask)
+        
 
 
-            bid_price = highest_bid + action[0][0] * (lowest_ask - highest_bid) / 2
-            ask_price = lowest_ask - action[0][1] * (lowest_ask - highest_bid) / 2
-            #print("price done")
-            bid_size = tf.math.floor(action[0][2] * 100)
-            ask_size = tf.math.floor(action[0][3] * 100)
-            #print("size done")
-            # bid_price = highest_bid + tf.expand_dims(action[0][0], axis=-1) * (lowest_ask - highest_bid) / 2
-            # ask_price = lowest_ask - tf.expand_dims(action[0][1], axis=-1) * (lowest_ask - highest_bid) / 2
-            # print("price done")
-            # bid_size = tf.math.floor(tf.expand_dims(action[0][2], axis=-1) * 100)
-            # ask_size = tf.math.floor(tf.expand_dims(action[0][3], axis=-1) * 100)
-            # print("size done")
+        executed_bid_price, executed_ask_price, executed_bid_size, executed_ask_size = self.env.update_book(ob, bid_price.numpy(), ask_price.numpy(), bid_size.numpy(), ask_size.numpy(), self.agent_id)
 
-            print("reqch")
-            self.update_book(bid_price.numpy(), ask_price.numpy(), bid_size.numpy(), ask_size.numpy())
+        PL, size_diff, reward = self.env.get_reward(executed_ask_price, executed_ask_size, executed_bid_price, executed_bid_size, highest_bid, lowest_ask)
+        
+        
+        # self.rewards.append(reward)
+        self.rewards[i] = reward
+        #print("rewards appended")
+        self.capital += PL
+        self.size += size_diff
 
-            #update orderbook
-            reward = (ask_price * ask_size - bid_price * bid_size) - abs(bid_price - highest_bid) - abs(lowest_ask - ask_price)
-            if i==500 or i==1500:
-              print(action, logprob, reward)
-            self.rewards.append(reward)
-            #print("rewards appended")
-            self.capital += reward
-            self.size += bid_size - ask_size
+        if i==1500 or i==1700:
+            print(action)
+            print(logprob)
+            print(reward)
+        new_state = []
 
-            new_state = []
-
-            bids = self.orderbook.get_bids(self.agent_id)
-            asks = self.orderbook.get_asks(self.agent_id)
-
-            highest_bid = bids[0][0] if bids else None
-            lowest_ask = asks[0][0] if asks else None
+        highest_bid, lowest_ask = self.env.get_highestbid_lowestask(ob, self.agent_id)
 
 
-            new_state.append(highest_bid)
-            new_state.append(lowest_ask)
-            new_state.append(lowest_ask - highest_bid)
-            new_state.append((lowest_ask + highest_bid)/2)
-            new_state.append(self.capital)
-            new_state.append(self.size)
-            #new_state.append(volatility + 0.001*np.random.randint(0,10))
+        new_state.append(highest_bid)
+        new_state.append(lowest_ask)
+        new_state.append(lowest_ask - highest_bid)
+        new_state.append((lowest_ask + highest_bid)/2)
+        new_state.append(self.capital)
+        new_state.append(self.size)
+        #new_state.append(volatility + 0.001*np.random.randint(0,10))
 
-            self.new_states.append(new_state)
-            price+=10
-            #print("end of collect")
+        # self.new_states.append(new_state)
+        self.new_states[i] = new_state
+        #print("end of collect")
+        self.t+=1
 
-    def update_book(self, b_p, a_p, b_s, a_s):
+    def do_action(self, state):
+        tfstate = tf.convert_to_tensor(state, dtype=tf.float32)
+        tfstate = tf.expand_dims(tfstate, axis=0)  
+        action, logprob = self.actor.sample_normal(tfstate, reparameterize=False)
 
-        print("updqtte")
-
-        sidebuy = Side.BUY
-        sidesell = Side.SELL
-
-        pricebuy = b_p
-        pricesell = a_p
-
-        sizebuy = b_s
-        sizesell = a_s
-
-        ordbuy = Order(sidebuy, pricebuy, sizebuy, owner_id=self.agent_id)
-        ordsell = Order(sidesell, pricesell, sizesell, owner_id=self.agent_id)
-
-        executed_trades_buy = self.orderbook.add_order(ordbuy)
-        executed_trades_sell = self.orderbook.add_order(ordsell)
-
-        if executed_trades_buy:
-            print("Order was matched! Trades executed:")
-            for trade in executed_trades_buy:
-                print(f"Traded {trade.size} at {trade.price} with {trade.maker_id}")
-        else:
-            print("Order added to the book. No immediate execution.")
-
-        if executed_trades_sell:
-            print("Order was matched! Trades executed:")
-            for trade in executed_trades_sell:
-                print(f"Traded {trade.size} at {trade.price} with {trade.maker_id}")
-        else:
-            print("Order added to the book. No immediate execution.")
-
-
+        return action, logprob
+    
+    def decide_prices_sizes(self, action, highest_bid, lowest_ask):
+        bid_price = highest_bid + action[0][0] * (lowest_ask - highest_bid) / 2
+        ask_price = lowest_ask - action[0][1] * (lowest_ask - highest_bid) / 2
+        #print("price done")
+        bid_size = tf.math.floor(action[0][2] * 100)
+        ask_size = tf.math.floor(action[0][3] * 100)
+        #print("size done")
+        return bid_price, ask_price, bid_size, ask_size
+    
         
     def sample_batch(self):
         states = []
@@ -257,7 +206,7 @@ class Agent:
 
                 value_target = critic_value - log_probs           #tells difference in how good action is and its probability of getting chosen
                                                                 #i.e. how far critic and actor are
-                value_loss = 0.5 * tf.reduce_mean(tf.square(value, value_target))
+                value_loss = 0.5 * tf.reduce_mean(tf.square(value - value_target))
 
 
             value_network_gradient = tape.gradient(value_loss,
@@ -300,8 +249,8 @@ class Agent:
                 q_hat = self.scale*rewards + self.gamma*value_*(1-done)
                 q1_old_policy = tf.squeeze(self.critic_1(states, actions), 1)
                 q2_old_policy = tf.squeeze(self.critic_2(states, actions), 1)
-                critic_1_loss = 0.5 * tf.reduce_mean(tf.square(q1_old_policy, q_hat))
-                critic_2_loss = 0.5 * tf.reduce_mean(tf.square(q2_old_policy, q_hat))
+                critic_1_loss = 0.5 * tf.reduce_mean(tf.square(q1_old_policy - q_hat))
+                critic_2_loss = 0.5 * tf.reduce_mean(tf.square(q2_old_policy - q_hat))
 
             critic_1_network_gradient = tape.gradient(critic_1_loss,
                                             self.critic_1.trainable_variables)
@@ -324,7 +273,7 @@ class Agent:
         print("\n")
 
     def get_action(self, hb, la):
-        self.state = [ hb, la, la - hb, self.capital, self.size]
+        self.state = [ hb, la, la - hb, (la + hb)/2, self.capital, self.size]
         state = tf.convert_to_tensor(self.state)
         state = tf.expand_dims(state, axis = 0)
         mu, sigma = self.actor(state)
