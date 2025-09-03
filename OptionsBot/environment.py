@@ -14,13 +14,16 @@ class Env:
     def __init__(self):
         self.exchange = MarketExchange(underlying_price=100, interval=5, option_depth=6)
         self.option_ticker_names = [ticker for ticker in self.exchange.market_books if ticker != 'STOCK_UNDERLYING']
-        
+        # self.orderbooks = list(self.exchange.market_books.values())
 
     def get_orderbook(self):
         random_ticker = random.choice(self.option_ticker_names)
         orderbook = self.exchange.get_book(random_ticker)
 
         return orderbook
+    
+        # i = np.random.randint(0,27)
+        # return self.orderbooks[i]
     
     def get_highestbid_lowestask(self, ob, agent_id):
         bids = ob.get_bids(agent_id)

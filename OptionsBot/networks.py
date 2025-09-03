@@ -70,8 +70,6 @@ class spreadActorNetwork(keras.Model):
 
         mu = self.mu(prob)
         sigma = self.sigma(prob)
-        # might want to come back and change this, perhaps tf plays more nicely with
-        # a sigma of ~0
         sigma = tf.clip_by_value(sigma, self.noise, 1)
 
         return mu, sigma
@@ -82,7 +80,7 @@ class spreadActorNetwork(keras.Model):
 
 
         if reparameterize:
-            actions = probabilities.sample() # + something else if you want to implement
+            actions = probabilities.sample() 
         else:
             actions = probabilities.sample()
 

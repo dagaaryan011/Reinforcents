@@ -87,19 +87,49 @@ trend=p.get_path()
 
 
 env = Env()
-agent = Agent()
-agent.env = env
+agent1 = Agent('market_maker1')
+agent1.env = env
+agent2 = Agent('market_maker2')
+agent2.env = env
+agent3 = Agent('market_maker3')
+agent3.env = env
+exchange = MarketExchange()
+env.exchange = exchange
 
+print(len(trend))
 for i in range(0,len(trend)):
+    #print(agent1.t)
+
+    #exchange = MarketExchange(underlying_price=trend[i], interval=5, option_depth=6)
+    #env.exchange = exchange
     #print(i, "run")
     #agent.exchange = exchange
-    agent.collect()
-    if agent.t==2000:
+    #agent.collect()
+    if agent1.t<2001:
         #agent.sample_batch()
-        agent.learn()
-    if agent.t > 2000 and agent.t%100 == 0:
+        agent1.collect()
+        agent2.collect()
+        agent3.collect()
+    elif agent1.t==2000:
+        #print("2000 reach")
+        agent1.collect()
+        agent2.collect()
+        agent3.collect()
+        agent1.learn()
+        agent2.learn()
+        agent3.learn()
+    elif agent1.t > 2000 :
+        #print(agent1.t)
         #agent.sample_batch()
-        agent.learn()
+        agent1.collect()
+        agent2.collect()
+        agent3.collect()
+        if agent1.t%2000 == 0:
+            agent1.learn()
+            agent2.learn()
+            agent3.learn()
+
+
 
 
 #print(agent.get_action(98, 99)) 
