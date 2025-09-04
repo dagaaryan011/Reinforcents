@@ -1,5 +1,5 @@
-from orderbook import OrderBook
-from trade_records import TradeLedger
+from .orderbook import OrderBook
+from .trade_records import TradeLedger
 
 class MarketExchange:
     def __init__(self, underlying_price=100, interval=5, option_depth=6):
@@ -58,4 +58,4 @@ class MarketExchange:
                 new_book_market_price = self.calculate_initial_premium(ticker_tuple)
                 book.market_price = new_book_market_price
                 book._prune_stale_orders()
-                book._maintain_book_depth()
+                # book._maintain_book_depth()

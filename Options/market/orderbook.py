@@ -210,7 +210,7 @@ class OrderBook:
         self.market_price = market_price
         self.ledger = ledger
         self.notifications = defaultdict(list)
-        self._maintain_book_depth()
+       
 
     def collect_notifications_for(self, agent_id):
         if agent_id in self.notifications:
@@ -221,13 +221,12 @@ class OrderBook:
 
     def add_order(self, order):
         executed_trades = []
-        order.price = self._round_to_tick(order.price)
         if not self._is_price_acceptable(order.price):
             return executed_trades
-        print(f"  -> BOOK ({self.ticker_id}): Received an order -> {order}")
+        print(f"ORDER: {order.owner_id} : ({self.ticker_id}): price:{order.price}: {order.side}")
         order.order_id = self._new_order_id()
         executed_trades = self._process_order(order)
-        self._maintain_book_depth()
+        
         return executed_trades
 
     def get_bids(self, agent_type='retail'):
@@ -248,8 +247,7 @@ class OrderBook:
             if not self._is_price_acceptable(price):
                 del self.offers[price]
 
-    def _round_to_tick(self, price, tick_size=0.05):
-        return round(round(price / tick_size) * tick_size, 2)
+   
 
     def _new_order_id(self):
         self.order_id += 1
@@ -260,24 +258,24 @@ class OrderBook:
         upper_bound = self.market_price * (1 + price_limit_pct)
         return lower_bound <= price <= upper_bound
 
-    def _maintain_book_depth(self, min_depth=10, price_spread_pct=0.05, max_size=50):
-        num_bids = len(self.bids)
-        num_offers = len(self.offers)
-        bids_to_add = min_depth - num_bids
-        offers_to_add = min_depth - num_offers
+    # def _maintain_book_depth(self, min_depth=10, price_spread_pct=0.05, max_size=50):
+    #     num_bids = len(self.bids)
+    #     num_offers = len(self.offers)
+    #     bids_to_add = min_depth - num_bids
+    #     offers_to_add = min_depth - num_offers
         
-        if bids_to_add > 0:
-            for _ in range(bids_to_add):
-                price = self._round_to_tick(random.uniform(self.market_price * (1 - price_spread_pct), self.market_price * 0.995))
-                size = random.randint(1, max_size)
-                order = Order(side=Side.BUY, price=price, size=size, owner_id='LIQUIDITY_PROVIDER')
-                self.bids[order.price].append(order)
-        if offers_to_add > 0:
-            for _ in range(offers_to_add):
-                price = self._round_to_tick(random.uniform(self.market_price * 1.005, self.market_price * (1 + price_spread_pct)))
-                size = random.randint(1, max_size)
-                order = Order(side=Side.SELL, price=price, size=size, owner_id='LIQUIDITY_PROVIDER')
-                self.offers[order.price].append(order)
+    #     if bids_to_add > 0:
+    #         for _ in range(bids_to_add):
+    #             price = self.market_price
+    #             size = random.randint(1, max_size)
+    #             order = Order(side=Side.BUY, price=price, size=size, owner_id='LIQUIDITY_PROVIDER')
+    #             self.bids[order.price].append(order)
+    #     if offers_to_add > 0:
+    #         for _ in range(offers_to_add):
+    #             price = self.market_price
+    #             size = random.randint(1, max_size)
+    #             order = Order(side=Side.SELL, price=price, size=size, owner_id='LIQUIDITY_PROVIDER')
+    #             self.offers[order.price].append(order)
 
     def _process_order(self, incoming_order):
         trades = []
@@ -309,7 +307,7 @@ class OrderBook:
             
             trade_size = min(incoming_order.size, book_order.size)
             new_trade = Trade(self.ticker_id, book_order.price, trade_size, incoming_order, book_order)
-            print(f"    ==> TRADE EXECUTED in {self.ticker_id}: Size {new_trade.size} @ {new_trade.price}")
+            print(f" Trade : {new_trade.taker_id} [{new_trade.taker_side.name}] matched with {new_trade.maker_id} [{new_trade.maker_side.name}] for {new_trade.size} units @ {new_trade.price} in {self.ticker_id}")
             self.ledger.record_trade(new_trade)
             trades_at_level.append(new_trade)
             

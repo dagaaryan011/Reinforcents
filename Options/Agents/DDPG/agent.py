@@ -2,16 +2,17 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.optimizers import Adam
-from buffer import ReplayBuffer # Renamed for clarity
-from network import ActorNetwork, CriticNetwork
+from .buffer import ReplayBuffer # Renamed for clarity
+from .network import ActorNetwork, CriticNetwork
 
 import os
 
-class Agent:
+class AgentDDPG:
     def __init__(self, input_dims, env, n_actions=12, n_tickers=11,
                  alpha=0.001, beta=0.002, gamma=0.99, tau=0.005,
                  max_size=1000000, fc1_dims=400, fc2_dims=300,
-                 batch_size=64, noise=0.1):
+                 batch_size=64, noise=0.1, agent_id = "DDPG1"):
+        self.agent_id = agent_id
         self.gamma = gamma
         self.tau = tau
         self.memory = ReplayBuffer(max_size, input_dims, n_actions)
