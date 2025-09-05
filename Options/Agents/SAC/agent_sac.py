@@ -87,11 +87,128 @@ class MarketMakerAgent:
         self.target_value.set_weights(weights)
 
     def learn(self):
-        # This is your partner's original logic
-        for k in range(10): # simplified loop
-            states, actions, rewards, new_states = self.sample_batch()
-            # ... The entire learning logic from your partner's file goes here ...
-            pass
+        self.scale = 2.0
+        self.gamma = 0.99
+        self.alpha = 0.05
+        self.batch_size = 500
+
+        #states, actions, log_probs, rewards, new_states = self.learn()
+        for k in range(0,10):
+            # if k%4==0:
+            #     print(k, end=" ")
+            states, actions,  rewards, new_states = self.sample_batch()
+            states = tf.convert_to_tensor(states, dtype=tf.float32)
+            actions = tf.convert_to_tensor(actions, dtype=tf.float32)
+            actions = tf.squeeze(actions,1)
+            #log_probs = tf.convert_to_tensor(log_probs, dtype=tf.float32)
+            rewards = tf.convert_to_tensor(rewards, dtype=tf.float32)
+            states_ = tf.convert_to_tensor(new_states, dtype=tf.float32)
+            #print(states.shape, actions.shape, rewards.shape, states_.shape)
+            #print("conversions done")
+
+            #print("optimizers set")
+
+            with tf.GradientTape() as tape:
+                value = tf.squeeze(self.value(states), 1)    #value for state
+                value_ = tf.squeeze(self.target_value(states_), 1)    #target value for state
+                #print("got values")
+                #print(value.shape, value_.shape)
+
+                current_policy_actions, log_probs = self.actor.sample_normal(states,    # get the actions and their probabilites of getting selected
+                                                            reparameterize=False)
+                #print(current_policy_actions.shape, log_probs.shape)
+                #current_policy_actions = tf.squeeze(current_policy_actions, 1)
+                #log_probs = tf.squeeze(log_probs, 1)
+                #print("squeezed acts, logs")
+                #print(current_policy_actions.shape, log_probs.shape)
+                q1_new_policy = self.critic_1(states, current_policy_actions)     #critic 1 for state action
+                q2_new_policy = self.critic_2(states, current_policy_actions)    #critic 2 for state action
+                #print(q1_new_policy.shape, q2_new_policy.shape)
+                #print("got critics")
+                critic_value = tf.squeeze(
+                                    tf.math.minimum(q1_new_policy, q2_new_policy), 1)     #get min of critics
+
+                value_target = critic_value - self.alpha*log_probs           #tells difference in how good action is and its probability of getting chosen
+                                                                #i.e. how far critic and actor are
+                value_loss = 0.5 * tf.reduce_mean(tf.square(value - value_target))
+
+
+            value_network_gradient = tape.gradient(value_loss,
+                                                    self.value.trainable_variables)
+
+            # for i, g in enumerate(value_network_gradient):
+            #     print(f"Grad {i}: {g}")
+
+            self.value.optimizer.apply_gradients(zip(
+                          value_network_gradient, self.value.trainable_variables))
+            #print("value update")
+
+
+            with tf.GradientTape() as tape:
+                # in the original paper, they reparameterize here. We don't implement
+                # this so it's just the usual action.
+                new_policy_actions, log_probs = self.actor.sample_normal(states,    #again action and and their logprobs
+                                                    reparameterize=True)
+                log_probs = tf.squeeze(log_probs, 1)
+                q1_new_policy = self.critic_1(states, new_policy_actions)    #critic 1
+                q2_new_policy = self.critic_2(states, new_policy_actions)    #critic 2
+                critic_value = tf.squeeze(tf.math.minimum(                   #their min
+                                            q1_new_policy, q2_new_policy), 1)
+
+                actor_loss = self.alpha*log_probs - critic_value                       # -ve of value_target which we want to maximizme and this we want to minimize
+                actor_loss = tf.math.reduce_mean(actor_loss)
+
+            actor_network_gradient = tape.gradient(actor_loss,
+                                                self.actor.trainable_variables)
+            # for i, g in enumerate(actor_network_gradient):
+            #     print(f"Grad {i}: {g}")
+            self.actor.optimizer.apply_gradients(zip(
+                            actor_network_gradient, self.actor.trainable_variables))
+            #print("actor update")
+
+            with tf.GradientTape(persistent=True) as tape:
+                done = 0
+                # I didn't know that these context managers shared values?
+                self.scale=0.5
+                q_hat = self.scale*rewards + self.gamma*value_*(1-done)
+                q1_old_policy = tf.squeeze(self.critic_1(states, actions), 1)
+                q2_old_policy = tf.squeeze(self.critic_2(states, actions), 1)
+                critic_1_loss = 0.5 * tf.reduce_mean(tf.square(q1_old_policy - q_hat))
+                critic_2_loss = 0.5 * tf.reduce_mean(tf.square(q2_old_policy - q_hat))
+
+            critic_1_network_gradient = tape.gradient(critic_1_loss,
+                                            self.critic_1.trainable_variables)
+            critic_2_network_gradient = tape.gradient(critic_2_loss,
+                self.critic_2.trainable_variables)
+
+            # for i, g in enumerate(critic_1_network_gradient):
+            #     print(f"Grad {i}: {g}")
+            # for i, g in enumerate(critic_2_network_gradient):
+            #     print(f"Grad {i}: {g}")
+
+            self.critic_1.optimizer.apply_gradients(zip(
+                critic_1_network_gradient, self.critic_1.trainable_variables))
+            self.critic_2.optimizer.apply_gradients(zip(
+                critic_2_network_gradient, self.critic_2.trainable_variables))
+            #print("critics update")
+
+            self.update_network_parameters()
+            #print("target value update")
+        #print("\n")
+
+    # def get_action(self, hb, la):
+    #     self.state = [ hb, la, la - hb, (la + hb)/2, self.capital, self.size]
+    #     state = tf.convert_to_tensor(self.state)
+    #     state = tf.expand_dims(state, axis = 0)
+    #     mu, sigma = self.actor(state)
+
+    #     bid_price = hb + mu[0][0] * (la - hb) / 2
+    #     ask_price = la - mu[0][1] * (la - hb) / 2
+    #     #print("price done")
+    #     bid_size = tf.math.floor(mu[0][2] * 100)
+    #     ask_size = tf.math.floor(mu[0][3] * 100)
+
+    #     return bid_price, ask_price, bid_size, ask_size
     def _calculate_portfolio_value(self, central_market):
         
         value = self.capital
