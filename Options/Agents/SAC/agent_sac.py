@@ -2,31 +2,38 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 import tensorflow_probability as tfp
-from .networks_sac import spreadActorNetwork, spreadCriticNetwork, spreadValueNetwork, bookActorNetwork, bookCriticNetwork
+from .networks_sac import actor, critic_1, critic_2, value, target_value, actor_optimizer, critic_1_optimizer, critic_2_optimizer, value_optimizer, target_value_optimizer
 from collections import defaultdict
+
+
+checkpoint_actor = "C:\ProjectX\Options\Agents\SAC\actor.weights.h5"
+checkpoint_critic_1 = "C:\ProjectX\Options\Agents\SAC\critic_1.weights.h5"
+checkpoint_critic_2 = "C:\ProjectX\Options\Agents\SAC\critic_2.weights.h5"
+checkpoint_value = "C:\ProjectX\Options\Agents\SAC\value.weights.h5"
+checkpoint_target_value = "C:\ProjectX\Options\Agents\SAC\target_value.weights.h5"
 
 class MarketMakerAgent:
     def __init__(self, id):
         self.agent_id = id
         self.env = None # This will be connected by main.py
         self.ticker = None
-        self.value = spreadValueNetwork()
-        self.target_value = spreadValueNetwork()
-        self.critic_1 = spreadCriticNetwork()
-        self.critic_2 = spreadCriticNetwork()
-        self.actor = spreadActorNetwork()
-        self.actor_optimizer = None
-        self.critic_1_optimizer = None
-        self.critic_2_optimizer = None
-        self.value_optimizer = None
-        self.target_value_optimizer = None
+        self.value = value
+        self.target_value = target_value
+        self.critic_1 = critic_1
+        self.critic_2 = critic_2
+        self.actor = actor
+        self.actor_optimizer = actor_optimizer
+        self.critic_1_optimizer = critic_1_optimizer
+        self.critic_2_optimizer = critic_2_optimizer
+        self.value_optimizer = value_optimizer
+        self.target_value_optimizer = target_value_optimizer
         self.tau = 0.005
         self.scale = 2.0
         self.gamma = 0.99
         self.alpha = 0.05
-        self.batch_size = 2
-        self.memory_size = 5
-        self.batch_times = 2
+        self.batch_size = 50
+        self.memory_size = 100
+        self.batch_times = 10
         self.states = [0] * self.memory_size
         self.actions = [0] * self.memory_size
         self.log_probs = [0] * self.memory_size
@@ -37,6 +44,30 @@ class MarketMakerAgent:
         self.order_num = 0
         self.orders = [0] * self.memory_size
         self.all_orders = []
+        self.load_weights()
+
+    def load_weights(self):
+        dummy_state = tf.random.normal((1, 14))
+        dummy_action = tf.random.normal((1, 4))
+
+        _ = self.actor(dummy_state)
+        _ = self.critic_1(dummy_state, dummy_action)
+        _ = self.critic_2(dummy_state, dummy_action)
+        _ = self.value(dummy_state)
+        _ = self.target_value(dummy_state)
+
+        self.actor.load_weights('actor.weights.h5')
+        self.critic_1.load_weights('critic_1.weights.h5')
+        self.critic_2.load_weights('critic_2.weights.h5')
+        self.value.load_weights('value.weights.h5')
+        self.target_value.load_weights('target_value.weights.h5')
+
+    def save_weights(self):
+        self.actor.save_weights('actor.weights.h5')
+        self.critic_1.save_weights('critic_1.weights.h5')
+        self.critic_2.save_weights('critic_2.weights.h5')
+        self.value.save_weights('value.weights.h5')
+        self.target_value.save_weights('target_value.weights.h5')
 
     def set_agent_ticker(self, t):
         self.ticker = t
@@ -67,7 +98,7 @@ class MarketMakerAgent:
         self.all_orders.append(buy_id)
         self.all_orders.append(sell_id)
 
-        reward = self.env.get_reward(self.ticker, executed_ask_price, executed_ask_size, executed_bid_price, executed_bid_size, state[2], state[3])
+        reward = self.env.get_reward(self.ticker, ask_price, ask_size, bid_price, bid_size, state[2], state[3])
         self.rewards[i] = reward
 
         self.t += 1
@@ -79,7 +110,7 @@ class MarketMakerAgent:
     
     def decide_prices_sizes(self, action, highest_bid, lowest_ask):
         action_values = action[0]
-        size = min(self.env.inventory, 10)
+        size = min(self.env.temp_inventory, 10)
         price = min((lowest_ask - highest_bid)/2, self.env.capital)
         bid_price = highest_bid + action_values[0] * price
         ask_price = lowest_ask - action_values[1] * (lowest_ask - highest_bid) / 2
@@ -122,32 +153,22 @@ class MarketMakerAgent:
             log_probs = tf.convert_to_tensor(log_probs, dtype=tf.float32)
             rewards = tf.convert_to_tensor(rewards, dtype=tf.float32)
             states_ = tf.convert_to_tensor(new_states, dtype=tf.float32)
-            #print(states.shape, actions.shape, rewards.shape, states_.shape)
-            #print("conversions done")
-
-            #print("optimizers set")
 
             with tf.GradientTape() as tape:
                 value = tf.squeeze(self.value(states), 1)    #value for state
                 value_ = tf.squeeze(self.target_value(states_), 1)    #target value for new state
-                #print("got values")
-                #print(value.shape, value_.shape)
 
                 current_policy_actions, current_log_probs = self.actor.sample_normal(states,    # get the actions and their probabilites of getting selected
                                                             reparameterize=False)
-                #print(current_policy_actions.shape, log_probs.shape)
-                #current_policy_actions = tf.squeeze(current_policy_actions, 1)
                 q1_new_policy = self.critic_1(states, current_policy_actions)     #critic 1 for state action
                 q2_new_policy = self.critic_2(states, current_policy_actions)    #critic 2 for state action
-                #print(q1_new_policy.shape, q2_new_policy.shape)
-                #print("got critics")
                 critic_value = tf.squeeze(
                                     tf.math.minimum(q1_new_policy, q2_new_policy), 1)     #get min of critics
 
-                value_target = critic_value - self.alpha*log_probs           #tells difference in how good action is and its probability of getting chosen
+                value_target = critic_value - self.alpha*log_probs           #tells difference in how good action is and 
+                                                                                    #its probability of getting chosen
                                                                 #i.e. how far critic and actor are
                 value_loss = 0.5 * tf.reduce_mean(tf.square(value - value_target))
-
 
             value_network_gradient = tape.gradient(value_loss,
                                                     self.value.trainable_variables)
@@ -166,14 +187,14 @@ class MarketMakerAgent:
                 critic_value = tf.squeeze(tf.math.minimum(                   #their min
                                             q1_new_policy, q2_new_policy), 1)
 
-                actor_loss = self.alpha*new_policy_log_probs - critic_value   # -ve of value_target which we want to maximizme and this we want to minimize
+                actor_loss = self.alpha*new_policy_log_probs - critic_value   # -ve of value_target which we want to maximizme 
+                                                                                #and this we want to minimize
                 actor_loss = tf.math.reduce_mean(actor_loss)
 
             actor_network_gradient = tape.gradient(actor_loss,
                                                 self.actor.trainable_variables)
             self.actor_optimizer.apply_gradients(zip(
                             actor_network_gradient, self.actor.trainable_variables))
-            #print("actor update")
 
             with tf.GradientTape(persistent=True) as tape:
                 self.scale=0.5

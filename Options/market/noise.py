@@ -22,7 +22,7 @@ def generate_daily_price_path(current_date):
         data = yf.download(ticker, start=start_date, end=end_date, progress=False)
         if data.empty:
             # This happens on weekends or holidays
-            return None , 0, 0, 0, 0
+            return None
         else:
             ohlc = data.iloc[0]
             open_price = ohlc['Open'].item()
@@ -64,7 +64,7 @@ def generate_daily_price_path(current_date):
     constrained_path[0] = open_price
     constrained_path[-1] = close_price
 
-    return constrained_path, open_price, close_price, high_price, low_price
+    return constrained_path
     
 # This block will only run when you execute `python noise.py` directly
 if __name__ == '__main__':

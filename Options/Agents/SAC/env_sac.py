@@ -6,12 +6,16 @@ import csv
 from market.orderbook import Order, Side
 from .agent_sac import MarketMakerAgent
 from .blackscholes import BlaScho
+import tensorflow as tf
+
 
 # black = BlaScho()
 
 class MarketMakerEnv:
     def __init__(self):
         self.exchange = None  # Will be connected by main.py
+        self.days_passed = 0
+        self.mins_passed = 0
 
         self.tickers_list = []
         
@@ -19,6 +23,7 @@ class MarketMakerEnv:
         self.capital = 100000
         self.start_amount = 100
         self.start_cash = 100000
+        self.temp_inventory = 100
         self.portfolio = {}
 
         # data dictionaries for each ticker
@@ -64,90 +69,55 @@ class MarketMakerEnv:
 
         return [c, q, hb, la, s, m, p, d, g, t, v, ti, vo, cm]
 
-    def run_step_min(self, price, agent_id):
-        self.get_min_prices(price) #append current minute underlying price
-        self.get_highestbid_dict(agent_id) # get the highest bids in all tickers
-        self.get_lowestask_dict(agent_id)  # get the lowest asks in all tickers
-        self.get_spread_and_mid_dict()     # get the spreads and mid values for all tickers
+    def run_first_day(self):
+        self.min_prices = []
+        self.get_ticker_list()
+    
+    def run_first_day_min(self, price):
+        self.get_min_prices(price)
 
-    def run_step_day(self, open, close, high, low, expiry):
-        self.get_ticker_list()    # gets the option tickers for today
-        self.set_mfm_and_volumes_and_mfv_dicts()   # resets the cmf calculation for today
-        self.volatility = self.get_volatility()   #gets volatility in price till today
-        self.get_day_prices_and_cmf_related(open, close, high, low, expiry) #does all calcs of getting cmf though balckscholes on openclosehighlow of prev day for all orderbooks 
-        self.time_to_expiry = expiry    #constant for today
-        self.get_premium_and_greek_dict(open)   #gets the premiums and greeks of all options/ tickers using blackscholes
-        self.get_CMF_dict()      #gets CMF for today 
+    def run_step_day(self, expiry, price):
+        open, close, high, low = self.get_open_close_high_low()  # for today based on prev day
+        self.get_ticker_list()    # option tickers for today
+        self.reset_mfm_and_volumes_and_mfv_dicts()   # resets the cmf calculation for today
+        self.get_volumes()
+        self.get_day_prices_and_cmf_related(open, close, high, low, expiry) # calcs of cmf of prev day for all orderbooks 
+        self.time_to_expiry = expiry   
+        self.get_premium_and_greek_dict(price)   #premiums and greeks of all options/ tickers using blackscholes
+        self.get_CMF_dict()      #gets CMF list for all tickers for today 
+        self.min_prices = []
         # all these once calculated for today will be constant throughout the day
 
-    def reset_portfolio(self):   # at new expiry option
-        for ticker in self.tickers_list:
-            self.portfolio[ticker] = 0
-
-    def reset_minute_data(self):
-        self.highest_bids = {}
-        self.lowest_asks = {}
-        self.spreads = {}
-        self.mids = {}
+    def run_step_min(self, price, agent_id):
+        self.volatility = self.get_volatility()   #gets volatility in price till current min
+        self.get_min_prices(price) #append current minute underlying price
+        self.get_highestbid_lowestask_dict(agent_id) # get the highest bids and lowest asks of all tickers
+        self.get_spread_and_mid_dict()     # get the spreads and mid values for all tickers
 
     def get_ticker_list(self):
         self.tickers_list = [t[0] for t in self.exchange.tickers if t[0] != 'STOCK_UNDERLYING']
         for t in self.tickers_list:
             self.portfolio[t] = 0
         #print(self.tickers_list)
+    
+    def get_open_close_high_low(self):
+        open = self.min_prices[0]
+        close = self.min_prices[-1]
+        high = max(self.min_prices)
+        low = min(self.min_prices)
 
-    def set_mfm_and_volumes_and_mfv_dicts(self):
+        return open, close, high, low
+
+    def reset_mfm_and_volumes_and_mfv_dicts(self):
         for ticker in self.tickers_list:
             self.volumes.setdefault(ticker, [])
             self.MFV.setdefault(ticker, [])
             self.MFM.setdefault(ticker,[])
 
-    def get_min_prices(self, price):
-        self.min_prices.append(price)
-
-    def get_highestbid_dict(self, agent_id):
+    def get_volumes(self):
         for ticker in self.tickers_list:
-            ob = self.exchange.get_book(ticker)
-            bids = ob.get_bids(agent_id)
-            highest_bid = bids[0][0] if bids else ob.market_price
-            self.highest_bids[ticker] = highest_bid
-
-    def get_lowestask_dict(self, agent_id):
-        for ticker in self.tickers_list:
-            ob = self.exchange.get_book(ticker)
-            asks = ob.get_asks(agent_id)
-            lowest_ask = asks[0][0] if asks else ob.market_price
-            self.lowest_asks[ticker] = lowest_ask
-
-    def get_spread_and_mid_dict(self):
-        for ticker in self.tickers_list:
-            bid = self.highest_bids.get(ticker, 0)
-            ask = self.lowest_asks.get(ticker, 0)
-            self.spreads[ticker] = ask - bid
-            self.mids[ticker] = (ask + bid) / 2 if (ask + bid) != 0 else 0
-
-    def get_premium_and_greek_dict(self, open):
-        for ticker in self.tickers_list:
-            parts = ticker.split('_')
-            
-            if len(self.min_prices)<=1:
-                Spot = open
-            else:
-                Spot = self.min_prices[-1]
-            Strike = float(parts[1])
-            Time = self.time_to_expiry
-            if "PE" in ticker :
-                Option = "put"
-            else :
-                Option = "call"
-            black = BlaScho(Spot, Strike, Time, Option)
-            premium, delta, gamma, theta, vega = black.calculate()
-
-            self.premiums[ticker] = premium
-            self.deltas[ticker] = delta
-            self.gammas[ticker] = gamma
-            self.thetas[ticker] = theta
-            self.vegas[ticker] = vega
+            total_volume = self.get_executed_count(ticker)
+            self.volumes[ticker].append(total_volume)
 
     def get_day_prices_and_cmf_related(self, open, close, high, low, Time):
         self.opens.append(open)    #these lists are not used anywhere
@@ -175,19 +145,7 @@ class MarketMakerEnv:
             mfm = ((close_premium - low_premium) - (high_premium - close_premium)) / (high_premium - low_premium + 1e-6)  # Avoid division by zero
             self.MFM[ticker].append(mfm)
 
-            # Volume calc
-            total_volume = self.get_executed_count(ticker)
-            prev_total = self.volumes[ticker][-1] if self.volumes[ticker] else 0
-            daily_volume = total_volume - prev_total
-            self.volumes[ticker].append(total_volume)
-
-            # MFV calc
-            self.MFV[ticker].append(mfm * daily_volume)
-
-    def get_CMF_dict(self):     #uses calculate_CMF for each ticker
-        for ticker in self.tickers_list:
-            cmf = self.calculate_CMF(self.MFV[ticker], self.volumes[ticker])
-            self.CMF[ticker] = cmf
+            self.MFV[ticker].append(self.MFM[ticker][-1] * self.volumes[ticker][-1])
 
     def calculate_CMF(self, mfv_list, vol_list, n=10):
         mfv_array = np.array(mfv_list[-n:]) if len(mfv_list) >= n else np.array(mfv_list)
@@ -197,17 +155,88 @@ class MarketMakerEnv:
         if sum_vol == 0:
             return 0.0
         return float(np.sum(mfv_array)) / float(sum_vol)
+    
+    
+    def get_CMF_dict(self):     #uses calculate_CMF for each ticker
+        for ticker in self.tickers_list:
+            cmf = self.calculate_CMF(self.MFV[ticker], self.volumes[ticker])
+            self.CMF[ticker] = cmf
 
+    def get_premium_and_greek_dict(self, open):
+        for ticker in self.tickers_list:
+            parts = ticker.split('_')
+            
+            if len(self.min_prices)<=1:
+                Spot = open
+            else:
+                Spot = self.min_prices[-1]
+            Strike = float(parts[1])
+            Time = self.time_to_expiry
+            if "PE" in ticker :
+                Option = "put"
+            else :
+                Option = "call"
+            black = BlaScho(Spot, Strike, Time, Option)
+            premium, delta, gamma, theta, vega = black.calculate()
+
+            self.premiums[ticker] = premium
+            self.deltas[ticker] = delta
+            self.gammas[ticker] = gamma
+            self.thetas[ticker] = theta
+            self.vegas[ticker] = vega
+
+    
     def get_volatility(self):
         data = self.min_prices[-50:] if len(self.min_prices) > 50 else self.min_prices
         volatility = float(np.std(data)) if data else 0.0
         return volatility
 
+    def get_min_prices(self, price):
+        self.min_prices.append(price)
+
+    def get_highestbid_lowestask_dict(self, agent_id):
+        for ticker in self.tickers_list:
+            ob = self.exchange.get_book(ticker)
+            bids = ob.get_bids(agent_id)
+            asks = ob.get_asks(agent_id)
+            highest_bid = bids[0][0] if bids else ob.market_price
+            lowest_ask = asks[0][0] if asks else ob.market_price
+            self.highest_bids[ticker] = highest_bid
+            self.lowest_asks[ticker] = lowest_ask
+
+    def get_spread_and_mid_dict(self):
+        for ticker in self.tickers_list:
+            bid = self.highest_bids.get(ticker, 0)
+            ask = self.lowest_asks.get(ticker, 0)
+            self.spreads[ticker] = ask - bid
+            self.mids[ticker] = (ask + bid) / 2 if (ask + bid) != 0 else 0
+
+    
+    def reset_portfolio(self):   # at new expiry option
+        for ticker in self.tickers_list:
+            self.portfolio[ticker] = 0
+        self.days_passed = 0
+        self.mins_passed = 0
+        self.capital = 100000
+        self.start_cash = 100000
+        self.inventory = 100
+        self.temp_inventory = 100
+        self.start_amount = 100
+
+
+    def reset_minute_data(self):
+        self.highest_bids = {}
+        self.lowest_asks = {}
+        self.spreads = {}
+        self.mids = {}
+
+    
+
     def get_orderbook(self, ticker):   #returns the book for the ticker
         return self.exchange.get_book(ticker)
 
     def get_highestbid_lowestask(self, ticker, agent_id):   #returns highest_bid and lowest_ask of a ticker
-        ob = self.exchange.get_boook(ticker)
+        ob = self.exchange.get_book(ticker)
         bids = ob.get_bids(agent_id)
         asks = ob.get_asks(agent_id)
         highest_bid = bids[0][0] if bids else ob.market_price
@@ -234,9 +263,10 @@ class MarketMakerEnv:
         diff_ask = abs(lowest_ask - executed_ask_price)
         reward = PL - diff_bid - diff_ask
         size_diff = executed_bid_size - executed_ask_size
-        self.capital+=PL
-        self.inventory += size_diff
-        self.portfolio[ticker] += size_diff
+        # self.capital+=PL
+        # self.inventory += size_diff
+        # self.portfolio[ticker] += size_diff
+        self.temp_inventory += size_diff
         return reward
 
     def get_executed_count(self, target, column="Ticker", filepath="C:\ProjectX\OptionsMulti\Options\market\master_trades.csv"):   #for calulating vol (no of matched/executed trades) for each day
@@ -307,7 +337,7 @@ class MarketMakerEnv:
                     cash_settlement+=PL
                     PL=0
  
-    def action_at_expiry(self, final):    #settlement action calle dat end of expiry
+    def settlement(self, final):    #settlement action called at end of expiry
         cash_settlement = 0 
         for ticker in self.tickers_list:
             parts = ticker.split('_')
@@ -316,21 +346,16 @@ class MarketMakerEnv:
             PL = 0
             if amount < 0 :
                 if 'PE' in ticker :
-                    PL += final - strike
+                    PL = final - strike
                 else :
-                    PL += strike - final
-
+                    PL = strike - final
+                PL = min(0, PL) * amount
             if amount > 0 :
                 if 'PE' in ticker :
-                    if final<strike:
-                        PL += strike - final
-                    else :
-                        PL += 0
+                    PL = strike - final
                 else:
-                    if final>strike:
-                        PL += final-strike
-                    else :
-                        PL += 0
+                    PL = final-strike
+                PL = max(0, PL) * amount
             cash_settlement+=PL
             #print(cash_settlement)
     
@@ -338,11 +363,9 @@ class MarketMakerEnv:
 
     def get_PL(self, final, initial):      #get the final profit and loss at end of expiry 
         PL = (self.capital + final * self.inventory) - (self.start_cash + initial * self.start_amount)
-                                                        
-        new_start_capital = self.capital
-        new_start_inventory = self.inventory
-        self.start_cash = new_start_capital
-        self.start_amount = new_start_inventory
+                                               
+        self.start_cash = self.capital
+        self.start_amount = self.inventory
         return PL
     
     def notifications(self, ticker, agent_id):     # to check for trades which took place later on
@@ -353,29 +376,35 @@ class MarketMakerEnv:
                 self.portfolio[notif.ticker_id] += notif.size
                 self.inventory += notif.size
                 self.capital -= notif.price * notif.size
+                self.temp_inventory += notif.size
                 #print(notif.size)
             if notif.maker_side == Side.SELL:
                 self.portfolio[notif.ticker_id] -= notif.size
                 self.inventory -= notif.size
                 self.capital += notif.price * notif.size
+                self.temp_inventory += notif.size
                 #print(notif.size)
         
-    def _calculate_portfolio_value(self, central_market):
+    # def _calculate_portfolio_value(self, central_market):
         
-        value = self.env.capital
-        for ticker_name,quantity in self.inventory.items():
-            if quantity == 0:
-                continue
-            book = central_market.get_book(ticker_name)
-            if book:
-                price  = 0
-                if quantity>0:
-                    bids=book.get_bids('MarketMaker')
-                    if bids:
-                        price = bids[0][0]
-                    if price > 0:
-                        value += quantity * price 
-        return value
+    #     value = self.env.capital
+    #     for ticker_name,quantity in self.inventory.items():
+    #         if quantity == 0:
+    #             continue
+    #         book = central_market.get_book(ticker_name)
+    #         if book:
+    #             price  = 0
+    #             if quantity>0:
+    #                 bids=book.get_bids('MarketMaker')
+    #                 if bids:
+    #                     price = bids[0][0]
+    #                 if price > 0:
+    #                     value += quantity * price 
+    #     return value
+    
+    def eod(self):
+        self.mins_passed = 0
+        self.days_passed += 1
 
 def initialize_sac_agent(agent_id):        #to make an agent
     agent = MarketMakerAgent(id=agent_id)
@@ -383,8 +412,47 @@ def initialize_sac_agent(agent_id):        #to make an agent
     agent.env = env
     return agent, env
 
-def run_sac_step(agent, price, agent_id):   # step for each min
-    agent.env.run_step_min(price, agent_id)
+def run_sac_step(agent, price, agent_id, expiry):   # step for each min
+    if agent.env.days_passed <= 0 and agent.env.mins_passed <= 0 :   # for first day but start of day
+        agent.env.run_first_day()
+        agent.env.run_first_day_min(price)
+        agent.env.mins_passed += 1
+        # print("first, first")
+        # print(f"{agent_id} day {agent.env.days_passed} time {agent.env.mins_passed}")
+        return
+    
+    elif agent.env.days_passed > 0 and agent.env.mins_passed <= 0 :   # for another day but start of day
+        agent.env.run_step_day(expiry, price)
+        agent.env.run_step_min(price, agent_id)
+        agent.env.mins_passed += 1
+        # print("other, first")
+        # print(f"{agent_id} day {agent.env.days_passed} time {agent.env.mins_passed}")
+        return
+    
+    elif agent.env.days_passed <= 0 :           # for every other min of first day
+        agent.notifs() 
+        agent.env.run_first_day_min(price)
+        agent.env.mins_passed += 1
+        # print("first, other")
+        # print(f"{agent_id} day {agent.env.days_passed} time {agent.env.mins_passed}")
+        return
+    
+    else :       # for every other min of other day
+        agent.notifs()
+        agent.env.run_step_min(price, agent_id)
+        agent.env.mins_passed += 1
+        # print("other, other")
+        # print(f"{agent_id} day {agent.env.days_passed} time {agent.env.mins_passed}")
+
     agent.collect()
-    if agent.t > agent.memory_size and agent.t % 2 == 0:
+    if agent.t > agent.memory_size and agent.t % 50 == 0:
         agent.learn()
+
+def action_at_expiry(agent, final, initial):
+    agent.env.settlement(final)
+    PL = agent.env.get_PL(final,initial)
+    print(PL)
+    agent.save_weights()
+
+
+
