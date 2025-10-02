@@ -5,7 +5,7 @@ import pandas as pd
 from pathlib import Path
 
 class TradeLedger:
-    def __init__(self, file_path="D:/Reinforcents/stockmarket/data/master_trades.csv"):
+    def __init__(self, file_path="C:\ProjectX\OptionsTrading\Market\master_trades.csv"):
         self.trades_file = Path(file_path)
         self.trades_file.parent.mkdir(parents=True, exist_ok=True)
         self.trades = []
@@ -32,7 +32,7 @@ import pandas as pd
 from pathlib import Path
 
 class TradeLedger:
-    def __init__(self, file_path="D:/Reinforcents/stockmarket/data/master_trades.csv"):
+    def __init__(self, file_path="C:\ProjectX\OptionsTrading\Market\master_trades.csv"):
         self.trades_file = Path(file_path)
         self.trades_file.parent.mkdir(parents=True, exist_ok=True)
         self.trades = []
