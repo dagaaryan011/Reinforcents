@@ -80,11 +80,7 @@ class Broker:
             
     def reset_portfolio(self):
         self.portfolio = {}
-        self.capital = 100000
-        self.temp_capital = 100000
-        self.inventory = 100
-        self.temp_inventory = 100
-
+        
     def set_portfolio(self):
         for ticker in self.env.tickers_list:
             self.portfolio[ticker] = 0

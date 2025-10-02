@@ -10,6 +10,8 @@ class selector(keras.Model):
     def __init__(self):
         super(selector, self).__init__()
         
+        #used leaky beacuse all outputs were coming 0 
+        
         self.indiv1 = Dense(16, activation=None)
         self.leaky1 = LeakyReLU(alpha=0.01)
 
@@ -41,7 +43,6 @@ class selector(keras.Model):
                state16, state17, state18, state19, state20,
                state21, state22, state23, state24):
 
-        # Apply individual transformations to each state
         states = []
         for state in [state1, state2, state3, state4, state5,
                     state6, state7, state8, state9, state10,
@@ -55,10 +56,8 @@ class selector(keras.Model):
             state = self.leaky5(self.indiv5(state))
             states.append(state)
 
-        # Concatenate all transformed states along the last dimension
         state = tf.concat(states, axis=-1)
 
-        # Further processing
         state = self.leaky10(self.choose1(state))
         state = self.leaky11(self.choose2(state))
         state = self.choose3(state)

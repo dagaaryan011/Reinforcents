@@ -86,7 +86,7 @@ class Env:
                     count += float(row.get("Size"))
         return count
 
-    def get_day_prices_and_cmf_related(self,open, high, close, low, Time):
+    def get_day_prices_and_cmf_related(self,open, high, close, low, Time):     
 
         for ticker in self.tickers_list:
             # MFM calc
@@ -124,7 +124,7 @@ class Env:
             cmf = self.calculate_CMF(self.MFV[ticker], self.volumes[ticker])
             self.CMF[ticker] = cmf
 
-    def get_premium_and_greek_dict(self, open):
+    def get_premium_and_greek_dict(self, open): #calculates premium and greeks for all tickers
         for ticker in self.tickers_list:
             parts = ticker.split('_')
             
@@ -165,7 +165,7 @@ class Env:
             self.mids[ticker] = (ask + bid) / 2 if (ask + bid) != 0 else 0
 
 
-    def indicator(self):        
+    def indicator(self):         # calcculates cmf
         self.reset_mfm_and_volumes_and_mfv_dicts()
         self.get_volumes()
         open, high, close, low = self.get_open_high_close_low()
@@ -225,15 +225,15 @@ class Env:
 
 
 def run(agent, env):
-    if env.days_passed <= 0 and env.mins_passed <= 1 :
+    if env.days_passed <= 0 and env.mins_passed <= 1 :    #first day first min
         agent.broker.set_portfolio()
         print(" agent, first, first", env.days_passed, env.mins_passed)
-    elif env.days_passed > 0 and env.mins_passed <= 1 :
-        agent.broker.new_option()
-        print(" agent, other, first", env.days_passed, env.mins_passed)
-    elif env.days_passed <= 0 :
+    elif env.days_passed > 0 and env.mins_passed <= 1 :     # other day first min
+        agent.broker.new_option() 
+        print(" agent, other, first", env.days_passed, env.mins_passed)    
+    elif env.days_passed <= 0 :                            # first day other mins
         print(" agent, first, other", env.days_passed, env.mins_passed)
-    else :
+    else :                                                   # other day other mins
         agent.collect()
         print(" agent, other, other", env.days_passed, env.mins_passed)
 

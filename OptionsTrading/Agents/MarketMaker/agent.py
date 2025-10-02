@@ -45,25 +45,25 @@ class MarketMaker:
 
         self.broker.get_notifications(self.agent_id)
 
-        allstates = self.broker.get_all_states()
+        allstates = self.broker.get_all_states()   # gets state of all orderbooks together for sleecting
         self.selectstates[i] =allstates
         selection = self.select(allstates)
         print(selection)
 
-        random = np.random.rand()
+        random = np.random.rand()    # greedy
         if random < self.epsilon:
             idx = np.random.randint(0,24)
         else :
             idx = np.argmax(selection)
 
         print(idx)
-        ticker = self.broker.env.tickers_list[idx]
+        ticker = self.broker.env.tickers_list[idx]   # get the chosen ticker
 
         state = self.broker.get_actual_state(ticker)
         action, log_probs = self.get_action(state)
-        bid_price, bid_size, ask_price, ask_size = self.decide_values(action, state[1], state[2])
+        bid_price, bid_size, ask_price, ask_size = self.decide_values(action, state[1], state[2])  # decide the price and sizes
 
-        self.broker.update_book(ticker, bid_price, bid_size, ask_price, ask_size, self.agent_id)
+        self.broker.update_book(ticker, bid_price, bid_size, ask_price, ask_size, self.agent_id)   # place the order
 
         reward = self.get_reward(ticker, bid_price, bid_size, ask_price, ask_size, state[1], state[2])
 
@@ -77,7 +77,7 @@ class MarketMaker:
         if i-10>=0:
             self.new_states[i-10] = state
         else:
-            self.new_states[self.memory_size+i-10] = state
+            self.new_states[self.memory_size+i-10] = state   #new state  will be state after 10 steps
 
         self.t += 1
 
@@ -91,8 +91,8 @@ class MarketMaker:
         selection = self.selector(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], 
                                   a[12], a[13], a[14], a[15], a[16], a[17], a[18], a[19], a[20], a[21], a[22], a[23])
         
-        return selection.numpy()
-        
+        return selection.numpy()   # returns numpy of selectionn values
+         
     def get_action(self, state):
         tfstate = tf.convert_to_tensor([state], dtype=tf.float32)
         action, logprob = self.actor.sample_normal(tfstate, reparameterize=False)
@@ -127,11 +127,11 @@ class MarketMaker:
         for ticker in self.broker.env.tickers_list:
             print(self.broker.portfolio[ticker])
             print(self.broker.cash_settlement[ticker])
-            self.expiry_rewards.append(self.broker.cash_settlement[ticker])
+            self.expiry_rewards.append(self.broker.cash_settlement[ticker])    # at the end get the sttlement calculated for each ticker (comparing selector values with this)
             
 
     def sample_batch(self):
-        allstates, states, actions, log_probs, rewards, new_states = [], [], [], [], [], []
+        allstates, states, actions, log_probs, rewards, new_states = [], [], [], [], [], []    
         max_mem = min(self.t, self.memory_size)
         for _ in range(self.batch_size):
             j = np.random.randint(0, max_mem)
@@ -249,8 +249,8 @@ class MarketMaker:
         PL = self.broker.get_PL(initial, final)
         print(f"{self.agent_id} : {PL}")
         self.learn()
-        self.broker.new_option()
-        self.broker.reset_portfolio()
+        self.broker.new_option()     # resets for new option trading 
+        self.broker.reset_portfolio()   # empties the portfolio for tickers of next options trading
 
 def initialize_MM_agent(agent_id):
     Agent = MarketMaker(agent_id)
