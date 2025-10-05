@@ -1,0 +1,29 @@
+├── data/
+│   ├── models/
+│   │   └── universal_model.keras
+│   └── training_data/
+│       └── training_data_1.npy
+│
+├── src/
+│   ├── __init__.py
+│   ├── agent/
+│   │   ├── __init__.py
+│   │   └── agent.py
+│   │
+│   ├── market/
+│   │   ├── __init__.py
+│   │   ├── exchange.py
+│   │   ├── orderbook.py
+│   │   └── ...
+│   │
+│   ├── utils/
+│   │   ├── __init__.py
+│   │   └── functions.py
+│   │
+│   ├── data_processor.py
+│   └── model_setup.py
+│
+├── config.py
+├── main.py
+├── train.py
+└── requirements.txt
