@@ -2,8 +2,6 @@ import numpy as np
 from datetime import date, timedelta
 import matplotlib.pyplot as plt
 import time
-import tensorflow as tf
-from tensorflow.keras.optimizers import Adam
 
 # Import custom modules for the exchange, agents, and price generation.
 from Market.exchange import MarketExchange
@@ -72,7 +70,7 @@ class LivePlotter:
 if __name__ == '__main__':
     # --- Simulation Parameters ---
     start_date = date(2023, 2, 1)
-    n_episodes = 15  # Each episode represents one trading day.
+    n_episodes = 300  # Each episode represents one trading day.
     option_time = 5  # the total time of options trading
     # --- Agent Initialization ---
 
@@ -80,6 +78,8 @@ if __name__ == '__main__':
     mm_traders = []
     for i in range(1,2):
         mm_traders.append(initialize_MM_agent(agent_id=f"MM_{i}"))
+    for agent in mm_traders:
+        agent.load_models()
 
         
     # print(type(ddpg_traders[0][0]), type(ddpg_traders[0][1]))
@@ -124,11 +124,12 @@ if __name__ == '__main__':
         MM_env.exchange = central_market
         for agent in mm_traders:
             agent.broker.env = MM_env
+        
 
         print(f"\n--- Starting Episode {i+1} for Date: {current_date} ---")
         
         # --- Intraday Simulation Loop (by minute/step) ---
-        for step in range(30 - 1):
+        for step in range(len(daily_price_path) - 1):
 
             # Flag to indicate the end of the day.
             is_done = (step == len(daily_price_path) - 2)

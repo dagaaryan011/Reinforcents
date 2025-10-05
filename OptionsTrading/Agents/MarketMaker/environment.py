@@ -13,10 +13,11 @@ class Env:
         self.trend = []
         self.tickers_list = []
         self.strikes_dict = {}
-        self.MFM = {}
+        self.MFM = []
         self.volumes = {}
-        self.MFV = {}
-        self.CMF = {}
+        self.daily_volumes = []
+        self.total_volumes = {}
+        self.MFV = []
 
         self.highest_bids = {}
         self.lowest_asks = {}
@@ -29,11 +30,12 @@ class Env:
         self.vegas = {}
 
         self.time_to_expiry = 0
+        self.CMF = 0
         self.days_passed = 0
         self.mins_passed = 0
 
     def get_state(self, ticker):
-        cmf = self.CMF[ticker]
+        cmf = self.CMF
         hb = self.highest_bids[ticker]
         la = self.lowest_asks[ticker]
         s = self.spreads[ticker]
@@ -65,16 +67,21 @@ class Env:
             if t[0] != 'STOCK_UNDERLYING':
                 self.strikes_dict[t[0]] = t[1]
 
+    def set_total_volumes_dict(self):
+        for ticker in self.tickers_list:
+            self.total_volumes[ticker] = 0
+            
     def reset_mfm_and_volumes_and_mfv_dicts(self):
         for ticker in self.tickers_list:
             self.volumes.setdefault(ticker, [])
-            self.MFV.setdefault(ticker, [])
-            self.MFM.setdefault(ticker,[])
+        self.MFV = []
+        self.MFM = []
 
     def get_volumes(self):
         for ticker in self.tickers_list:
-            total_volume = self.get_executed_count(ticker)
-            self.volumes[ticker].append(total_volume)
+            daily_volume = self.get_executed_count(ticker)
+            self.volumes[ticker].append(daily_volume)
+            self.total_volumes[ticker] += daily_volume/1000
 
 
     def get_executed_count(self, target, column="Ticker", filepath="C:\ProjectX\OptionsTrading\Market\master_trades.csv"):   #for calulating vol (no of matched/executed trades) for each day
@@ -90,24 +97,15 @@ class Env:
 
         for ticker in self.tickers_list:
             # MFM calc
-            Strike = self.strikes_dict[ticker]
-            if 'CE' in ticker:
-                Option = "call"
-            else:
-                Option = "put"
-            # print(open, close, high, low, Strike, Time, Option)
-            black_open = BlaScho(open, Strike, Time, Option)
-            black_high = BlaScho(high, Strike, Time, Option)
-            black_close = BlaScho(close, Strike, Time, Option)
-            black_low = BlaScho(low, Strike, Time, Option)
-            open_premium, _, _, _, _= black_open.calculate()
-            high_premium, _, _, _, _= black_high.calculate()
-            close_premium, _, _, _, _= black_close.calculate()
-            low_premium, _, _, _, _= black_low.calculate()
-            mfm = ((close_premium - low_premium) - (high_premium - close_premium)) / (high_premium - low_premium + 1e-6)  # Avoid division by zero
-            self.MFM[ticker].append(mfm)
-
-            self.MFV[ticker].append(self.MFM[ticker][-1] * self.volumes[ticker][-1])
+            mfm = ((close - low) - (high - close)) / (high - low + 1e-6)
+            self.MFM.append(mfm)
+            daily_volume = 0
+            for ticker in self.tickers_list:
+                daily_volume+=self.volumes[ticker][-1]
+            mfv = mfm*daily_volume
+            self.MFV.append(mfv)
+            self.daily_volumes.append(daily_volume)
+            
 
     def calculate_CMF(self, mfv_list, vol_list, n=10):
         mfv_array = np.array(mfv_list[-n:]) if len(mfv_list) >= n else np.array(mfv_list)
@@ -119,10 +117,8 @@ class Env:
         return float(np.sum(mfv_array)) / float(sum_vol)
     
     
-    def get_CMF_dict(self):     #uses calculate_CMF for each ticker
-        for ticker in self.tickers_list:
-            cmf = self.calculate_CMF(self.MFV[ticker], self.volumes[ticker])
-            self.CMF[ticker] = cmf
+    def get_CMF(self):     #uses calculate_CMF for each ticker
+        self.CMF=self.calculate_CMF(self.MFV, self.daily_volumes)
 
     def get_premium_and_greek_dict(self, open): #calculates premium and greeks for all tickers
         for ticker in self.tickers_list:
@@ -170,7 +166,7 @@ class Env:
         self.get_volumes()
         open, high, close, low = self.get_open_high_close_low()
         self.get_day_prices_and_cmf_related(open, high, close, low, self.time_to_expiry)
-        self.get_CMF_dict()
+        self.get_CMF()
         self.mins_passed = 0
         self.days_passed += 1
 
@@ -187,6 +183,7 @@ class Env:
         self.strikes_dict = {}
         self.MFM = {}
         self.volumes = {}
+        self.total_volumes = {}
         self.MFV = {}
         self.CMF = {}
 
@@ -208,33 +205,35 @@ class Env:
         self.time_to_expiry = time
         if self.days_passed <= 0 and self.mins_passed <= 0 :
             self.get_tickers_strikes_list()
+            self.set_total_volumes_dict()
             self.get_trend(price)
-            print("first, first", self.days_passed, self.mins_passed)
+            # print("first, first", self.days_passed, self.mins_passed)
         elif self.days_passed > 0 and self.mins_passed <= 0 :
             self.trend = []
             self.get_trend(price)
             self.every_min()
-            print("other, first", self.days_passed, self.mins_passed)
+            # print("other, first", self.days_passed, self.mins_passed)
         elif self.days_passed <= 0 :
             self.get_trend(price)
-            print("first, other", self.days_passed, self.mins_passed)
+            # print("first, other", self.days_passed, self.mins_passed)
         else :
             self.every_min()
             self.get_trend(price)
-            print("other, other", self.days_passed, self.mins_passed)
+            # print("other, other", self.days_passed, self.mins_passed)
 
 
 def run(agent, env):
     if env.days_passed <= 0 and env.mins_passed <= 1 :    #first day first min
         agent.broker.set_portfolio()
-        print(" agent, first, first", env.days_passed, env.mins_passed)
+        # print(" agent, first, first", env.days_passed, env.mins_passed)
     elif env.days_passed > 0 and env.mins_passed <= 1 :     # other day first min
-        agent.broker.new_option() 
-        print(" agent, other, first", env.days_passed, env.mins_passed)    
-    elif env.days_passed <= 0 :                            # first day other mins
-        print(" agent, first, other", env.days_passed, env.mins_passed)
+        agent.broker.new_day() 
+        # print(" agent, other, first", env.days_passed, env.mins_passed)    
+    elif env.days_passed <= 0 :  
+        pass                          # first day other mins
+        # print(" agent, first, other", env.days_passed, env.mins_passed)
     else :                                                   # other day other mins
         agent.collect()
-        print(" agent, other, other", env.days_passed, env.mins_passed)
+        # print(" agent, other, other", env.days_passed, env.mins_passed)
 
     

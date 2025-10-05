@@ -1,7 +1,12 @@
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
+from torch.distributions import Beta
 import numpy as np
-from .networks import selector, ValueNetwork, CriticNetwork, ActorNetwork
+import os
+from .networks import Selector, ActorNetwork, CriticNetwork, ValueNetwork
 from .broker import Broker
-import tensorflow as tf
 
 class MarketMaker:
     def __init__(self, id):
@@ -9,7 +14,7 @@ class MarketMaker:
         self.agent_id = id
         self.broker = Broker()
 
-        self.selector = selector()
+        self.selector = Selector()
         self.actor = ActorNetwork()
         self.critic_1 = CriticNetwork()
         self.critic_2 = CriticNetwork()
@@ -21,25 +26,86 @@ class MarketMaker:
         self.gamma = 0.99
         self.alpha = 0.05
         self.epsilon = 1
-        self.batch_size = 10
-        self.memory_size = 20
-        self.batch_times = 5
+        self.batch_size = 50
+        self.memory_size = 200
+        self.batch_times = 10
         self.selectstates = [0] * self.memory_size
         self.states = [0] * self.memory_size
         self.actions = [0] * self.memory_size
-        self.log_probs = [0] * self.memory_size
         self.rewards = [0] * self.memory_size
         self.new_states = [0] * self.memory_size
 
+        self.expiry_volumes = []
+        self.expiry_volumes_highest_index = 0
+
         self.t = 0
 
-    # def load_models(Self):
+    def save_models(self):
 
-    
-    # def save_models(self):
+        agent_file_directory = os.path.dirname(os.path.abspath(__file__))
+        model_dir = os.path.join(agent_file_directory, 'models')
+        os.makedirs(model_dir, exist_ok=True) 
+
+        def save_network(network, optimizer, name):
+            model_path = os.path.join(model_dir, f'{name}_{self.agent_id}.pt')
+            torch.save(network.state_dict(), model_path)
+            
+            if optimizer:
+                optim_path = os.path.join(model_dir, f'{name}_optim_{self.agent_id}.pt')
+                torch.save(optimizer.state_dict(), optim_path)
+
+        print("\nSaving models...")
+        save_network(self.selector, self.selector.optimizer, 'selector')
+        save_network(self.actor, self.actor.optimizer, 'actor')
+        save_network(self.critic_1, self.critic_1.optimizer, 'critic_1')
+        save_network(self.critic_2, self.critic_2.optimizer, 'critic_2')
+        save_network(self.value, self.value.optimizer, 'value')
+        save_network(self.target_value, None, 'target_value') # No optimizer
+        print("Save complete.")
+
+
+    def load_models(self):
+        
+        agent_file_directory = os.path.dirname(os.path.abspath(__file__))
+        model_dir = os.path.join(agent_file_directory, 'models')
+        
+        def load_network(network, optimizer, name):
+            # 1. Load Model Weights
+            model_path = os.path.join(model_dir, f'{name}_{self.agent_id}.pt')
+            
+            if os.path.exists(model_path):
+                try:
+                    network.load_state_dict(torch.load(model_path, map_location=torch.device('cpu'))) 
+                    print(f"Loaded {name} weights.")
+                except Exception as e:
+                    print(f"Warning: Failed to load {name}. {e}")
+            else:
+                print(f"File not found: {model_path}. ")
+
+            # 2. Load Optimizer State
+            if optimizer:
+                optim_path = os.path.join(model_dir, f'{name}_optim_{self.agent_id}.pt')
+                if os.path.exists(optim_path):
+                    try:
+                        # 🔑 Correctly load into the optimizer object
+                        optimizer.load_state_dict(torch.load(optim_path, map_location=torch.device('cpu')))
+                        print(f"Loaded {name} optimizer state.")
+                    except Exception as e:
+                        print(f"Failed to load {name} optimizer.{e}")
+                else:
+                    print(f"Optimizer state not found for {name}. ")
+            
+        print("\nAttempting to load models...")
+        load_network(self.selector, self.selector.optimizer, 'selector')
+        load_network(self.actor, self.actor.optimizer, 'actor')
+        load_network(self.critic_1, self.critic_1.optimizer, 'critic_1')
+        load_network(self.critic_2, self.critic_2.optimizer, 'critic_2')
+        load_network(self.value, self.value.optimizer, 'value')
+        load_network(self.target_value, None, 'target_value')
 
 
     def collect(self):
+
 
         i = self.t % self.memory_size
 
@@ -48,13 +114,14 @@ class MarketMaker:
         allstates = self.broker.get_all_states()   # gets state of all orderbooks together for sleecting
         self.selectstates[i] =allstates
         selection = self.select(allstates)
+        probabilities = F.softmax(selection, dim=1).squeeze(0).detach().numpy()
         print(selection)
 
         random = np.random.rand()    # greedy
         if random < self.epsilon:
             idx = np.random.randint(0,24)
         else :
-            idx = np.argmax(selection)
+            idx = np.random.choice(24, p=probabilities)
 
         print(idx)
         ticker = self.broker.env.tickers_list[idx]   # get the chosen ticker
@@ -69,9 +136,8 @@ class MarketMaker:
 
         self.states[i] = state
         self.actions[i] = action
-        self.log_probs[i] = log_probs
         self.rewards[i] = reward
-        print(state)
+        # print(state)
         print(reward)
 
         if i-10>=0:
@@ -81,33 +147,43 @@ class MarketMaker:
 
         self.t += 1
 
+        if self.t % 200 == 0 and self.t > 0 :
+            self.expiry_volumes_highest_index = self.assign_volumes()
+            self.learn()
+
+        if self.t == 1000000:
+            self.t = 0
+
+        
+
     def select(self, allstates):
         a = []
 
         for state in allstates:
-            state_tensor = tf.expand_dims(state, axis=0) # Shape (1, 14)
+            # Convert each state (list/np.array of shape (15,)) to tensor (1, 15)
+            state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
             a.append(state_tensor)
 
         selection = self.selector(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], 
                                   a[12], a[13], a[14], a[15], a[16], a[17], a[18], a[19], a[20], a[21], a[22], a[23])
         
-        return selection.numpy()   # returns numpy of selectionn values
+        return selection   # returns numpy of selectionn values
          
     def get_action(self, state):
-        tfstate = tf.convert_to_tensor([state], dtype=tf.float32)
+        tfstate =  torch.tensor([state], dtype=torch.float32)
         action, logprob = self.actor.sample_normal(tfstate, reparameterize=False)
-        return action.numpy(), logprob.numpy()
+        return action.detach().numpy(), logprob.detach().numpy()
     
     def decide_values(self, action, highest_bid, lowest_ask):
         action_values = action[0]
-        print(action_values)
+        # print(action_values)
         size = min(self.broker.temp_inventory, 10)
         price = min((lowest_ask - highest_bid)/2, self.broker.temp_capital)
         bid_price = highest_bid + action_values[0] * price
         ask_price = lowest_ask - action_values[1] * (lowest_ask - highest_bid) / 2
         bid_size = int(action_values[2] * 10)
         ask_size = int(action_values[3] * size)
-        print(bid_price, ask_price, bid_size, ask_size)
+        # print(bid_price, ask_price, bid_size, ask_size)
         return bid_price, ask_price, bid_size, ask_size
         
     
@@ -125,131 +201,151 @@ class MarketMaker:
         self.broker.settlement(final)
         self.expiry_rewards = []
         for ticker in self.broker.env.tickers_list:
-            print(self.broker.portfolio[ticker])
-            print(self.broker.cash_settlement[ticker])
+            # print(self.broker.portfolio[ticker])
+            # print(self.broker.cash_settlement[ticker])
             self.expiry_rewards.append(self.broker.cash_settlement[ticker])    # at the end get the sttlement calculated for each ticker (comparing selector values with this)
-            
+    
+    def assign_volumes(self):
+        expiry_volumes = []
+        for ticker in self.broker.env.tickers_list:
+            expiry_volumes.append(self.broker.env.total_volumes[ticker])
+        
+        expiry_volumes = np.array(expiry_volumes)
+
+        idx = np.argmax(expiry_volumes)
+
+        return idx
+        # expiry_volumes = np.array(expiry_volumes)
+        # idx = np.argmax(expiry_volumes)
+        # for i in range(len(expiry_volumes)):
+        #     if i == idx :
+        #         expiry_volumes[i] = 1
+        #     else:
+        #         expiry_volumes[i] = 0
+
+        # return expiry_volumes
 
     def sample_batch(self):
-        allstates, states, actions, log_probs, rewards, new_states = [], [], [], [], [], []    
+        allstates, states, actions, rewards, new_states = [], [], [], [], []
         max_mem = min(self.t, self.memory_size)
         for _ in range(self.batch_size):
             j = np.random.randint(0, max_mem)
             allstates.append(self.selectstates[j])
             states.append(self.states[j])
             actions.append(self.actions[j])
-            log_probs.append(self.log_probs[j])
             rewards.append(self.rewards[j])
             new_states.append(self.new_states[j])
 
-        return allstates, states, actions, log_probs, rewards, new_states
+        return allstates, states, actions, rewards, new_states
 
 
     def update_network_parameters(self):
-        weights = []
-        targets = self.target_value.weights
-        for i, weight in enumerate(self.value.weights):
-            weights.append(weight * self.tau + targets[i] * (1 - self.tau))
-        self.target_value.set_weights(weights)
+        target_value_params = self.target_value.named_parameters()
+        value_params = self.value.named_parameters()
+
+        target_value_state_dict = dict(target_value_params)
+        value_state_dict = dict(value_params)
+
+        for name in value_state_dict:
+            value_state_dict[name] = self.tau*value_state_dict[name].clone() + (1-self.tau)*target_value_state_dict[name].clone()
+
+        self.target_value.load_state_dict(value_state_dict)
 
     def learn(self):
 
         for k in range(0,self.batch_times):
             
-            all_states_list_of_samples, states, actions, log_probs, rewards, new_states = self.sample_batch()
+            all_states_list_of_samples, states, actions, rewards, new_states = self.sample_batch()
 
-            states = tf.convert_to_tensor(states, dtype=tf.float32)
-            states_ = tf.convert_to_tensor(new_states, dtype=tf.float32)
-            actions = tf.convert_to_tensor(actions, dtype=tf.float32)
-            actions = tf.squeeze(actions, 1)
-            rewards = tf.convert_to_tensor(rewards, dtype=tf.float32)
-            log_probs = tf.convert_to_tensor(log_probs, dtype=tf.float32)
-            expiry_rewards = tf.convert_to_tensor(self.expiry_rewards, dtype=tf.float32)
+            states = torch.tensor(states, dtype=torch.float)
+            states_ = torch.tensor(new_states, dtype=torch.float)
+            actions = torch.tensor(actions, dtype=torch.float)
+            actions = torch.squeeze(actions, 1)
+            rewards = torch.tensor(rewards, dtype=torch.float)
+            expiry_volumes = torch.tensor(self.expiry_volumes, dtype=torch.float)
+            expiry_volumes = expiry_volumes.unsqueeze(0) 
+            expiry_volumes = expiry_volumes.expand(self.batch_size, -1)
 
+            target_index = self.expiry_volumes_highest_index
+            target_labels = torch.full((self.batch_size,), target_index, dtype=torch.long)
 
-            all_states_tensor = tf.convert_to_tensor(all_states_list_of_samples, dtype=tf.float32) 
-            t = tf.unstack(all_states_tensor, axis=1) 
+            all_states_tensor = torch.tensor(all_states_list_of_samples, dtype=torch.float) 
+            t = torch.unbind(all_states_tensor, axis=1) 
+
+            
+            logits = self.selector(t[0], t[1], t[2], t[3], t[4], t[5], t[6], t[7], t[8], t[9], 
+                       t[10], t[11], t[12], t[13], t[14], t[15], t[16], t[17], t[18],
+                       t[19], t[20], t[21], t[22], t[23])
 
 
             # SELECTOR UPDATE
-            with tf.GradientTape() as tape:
-                loss = tf.reduce_mean(tf.square(self.selector(t[0], t[1], t[2], t[3], t[4], t[5], t[6], t[7], t[8], t[9], 
-                                                              t[10], t[11], t[12], t[13], t[14], t[15], t[16], t[17], t[18],
-                                                               t[19], t[20], t[21], t[22], t[23]) - expiry_rewards))
-            selector_gradient = tape.gradient(loss, self.selector.trainable_variables)
-            self.selector.optimizer.apply_gradients(zip(selector_gradient, self.selector.trainable_variables))
+            self.selector.optimizer.zero_grad()
+            selector_loss = F.cross_entropy(logits, target_labels)
+            selector_loss.backward(retain_graph=True)
+            self.selector.optimizer.step()
 
+            value = self.value(states).view(-1)
+            value_ = self.target_value(states_).view(-1)
+            
+
+            new_actions, new_log_probs = self.actor.sample_normal(states, reparameterize=False)
+            new_log_probs = new_log_probs.view(-1)
+            q1_new_policy = self.critic_1.forward(states, new_actions)
+            q2_new_policy = self.critic_2.forward(states, new_actions)
+            critic_value = torch.min(q1_new_policy, q2_new_policy)
+            critic_value = critic_value.view(-1)
 
             # VALUE UPDATE
-            with tf.GradientTape() as tape:
-                value = tf.squeeze(self.value(states), 1)
-                value_ = tf.squeeze(self.target_value(states_), 1)
+            self.value.optimizer.zero_grad()
+            value_target = critic_value - self.alpha * new_log_probs
+            value_loss = 0.5 * F.mse_loss(value, value_target)
+            value_loss.backward(retain_graph=True)
+            self.value.optimizer.step()
 
-                current_policy_actions, current_log_probs = self.actor.sample_normal(states, reparameterize=False)
-                q1_new_policy = self.critic_1(states, current_policy_actions)
-                q2_new_policy = self.critic_2(states, current_policy_actions)
-                critic_value = tf.squeeze(tf.math.minimum(q1_new_policy, q2_new_policy), 1)
-                
-                # Squeeze log_probs to shape (BatchSize,)
-                current_log_probs_squeezed = tf.squeeze(current_log_probs, 1)
-
-                value_target = critic_value - self.alpha * current_log_probs_squeezed
-                
-                value_loss = 0.5 * tf.reduce_mean(tf.square(value - value_target))
-
-            value_network_gradient = tape.gradient(value_loss, self.value.trainable_variables)
-            self.value.optimizer.apply_gradients(zip(value_network_gradient, self.value.trainable_variables))
-
-
-            # ACTOR UPDATE
-            with tf.GradientTape() as tape:
-                new_policy_actions, new_policy_log_probs = self.actor.sample_normal(states, reparameterize=True)
-                
-                # Squeeze log_probs to shape (BatchSize,)
-                new_policy_log_probs_squeezed = tf.squeeze(new_policy_log_probs, 1)
-                
-                q1_new_policy = self.critic_1(states, new_policy_actions)
-                q2_new_policy = self.critic_2(states, new_policy_actions)
-                critic_value = tf.squeeze(tf.math.minimum(q1_new_policy, q2_new_policy), 1)
-
-                # Actor Loss: alpha * log_pi - Q_value
-                actor_loss = self.alpha * new_policy_log_probs_squeezed - critic_value
-                actor_loss = tf.math.reduce_mean(actor_loss)
-
-            actor_network_gradient = tape.gradient(actor_loss, self.actor.trainable_variables)
-            self.actor.optimizer.apply_gradients(zip(actor_network_gradient, self.actor.trainable_variables))
-
-
-            # CRITICS UPDATE
-            with tf.GradientTape(persistent=True) as tape:
-                self.scale=0.5
-                dones = 0
-                q_hat = self.scale*rewards + self.gamma*value_*(1-dones)
-                q1_old_policy = tf.squeeze(self.critic_1(states, actions), 1)
-                q2_old_policy = tf.squeeze(self.critic_2(states, actions), 1)
-                critic_1_loss = 0.5 * tf.reduce_mean(tf.square(q1_old_policy - q_hat))
-                critic_2_loss = 0.5 * tf.reduce_mean(tf.square(q2_old_policy - q_hat))
-
-            critic_1_network_gradient = tape.gradient(critic_1_loss, self.critic_1.trainable_variables)
-            critic_2_network_gradient = tape.gradient(critic_2_loss, self.critic_2.trainable_variables)
-
-            self.critic_1.optimizer.apply_gradients(zip(critic_1_network_gradient, self.critic_1.trainable_variables))
-            self.critic_2.optimizer.apply_gradients(zip(critic_2_network_gradient, self.critic_2.trainable_variables))
-
+            new_actions, new_log_probs = self.actor.sample_normal(states, reparameterize=True)
+            new_log_probs = new_log_probs.view(-1)
+            q1_new_policy = self.critic_1.forward(states, new_actions)
+            q2_new_policy = self.critic_2.forward(states, new_actions)
+            critic_value = torch.min(q1_new_policy, q2_new_policy)
+            critic_value = critic_value.view(-1)
             
-            # TARGET UPDATE
+            # ACTOR UPDATE
+            actor_loss = self.alpha * new_log_probs - critic_value
+            actor_loss = torch.mean(actor_loss)
+            self.actor.optimizer.zero_grad()
+            actor_loss.backward(retain_graph=True)
+            self.actor.optimizer.step()
+
+            # CRITIC UPDATE
+            self.critic_1.optimizer.zero_grad()
+            self.critic_2.optimizer.zero_grad()
+            q_hat = self.scale*rewards + self.gamma*value_
+            q1_old_policy = self.critic_1.forward(states, actions).view(-1)
+            q2_old_policy = self.critic_2.forward(states, actions).view(-1)
+            critic_1_loss = 0.5 * F.mse_loss(q1_old_policy, q_hat)
+            critic_2_loss = 0.5 * F.mse_loss(q2_old_policy, q_hat)
+
+            critic_loss = critic_1_loss + critic_2_loss
+            critic_loss.backward()
+            self.critic_1.optimizer.step()
+            self.critic_2.optimizer.step()
+
             self.update_network_parameters()
 
+            self.save_models()
+
         self.expiry_rewards = []
-        self.epsilon *= 0.999999
+        self.epsilon *= 0.999
+        self.expiry_volumes = []
 
     def action_at_expiry(self, initial, final):
         self.assign_settlements(final)
+        self.expiry_volumes_highest_index = self.assign_volumes()
         self.broker.settle()
         PL = self.broker.get_PL(initial, final)
-        print(f"{self.agent_id} : {PL}")
+        # print(f"{self.agent_id} : {PL}")
         self.learn()
-        self.broker.new_option()     # resets for new option trading 
+        self.broker.new_day()     # resets for new option trading 
         self.broker.reset_portfolio()   # empties the portfolio for tickers of next options trading
 
 def initialize_MM_agent(agent_id):

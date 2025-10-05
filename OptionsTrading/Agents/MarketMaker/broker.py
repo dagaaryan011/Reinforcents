@@ -58,15 +58,22 @@ class Broker:
         executed_trades_buy = ob.add_order(buy_order)
         executed_trades_sell = ob.add_order(sell_order)
 
-        done_buy_price = sum(t.price for t in executed_trades_buy)
+        done_buy_price = sum(t.price*t.size for t in executed_trades_buy)
         done_buy_size = sum(t.size for t in executed_trades_buy)
-        done_sell_price = sum(t.price for t in executed_trades_sell)
+        done_sell_price = sum(t.price*t.size for t in executed_trades_sell)
         done_sell_size = sum(t.size for t in executed_trades_sell)
 
-        self.capital += done_sell_price - done_buy_price
-        self.temp_capital += a_p - b_p + done_sell_price - done_buy_price
+        remaining_buy_size = b_s - done_buy_size
+        remaining_sell_size = a_s - done_sell_size
+
+        self.capital += done_sell_price - done_buy_price 
+        self.temp_capital += done_sell_price - done_buy_price
+
         self.inventory += done_buy_size - done_sell_size
-        self.temp_inventory += b_s - a_s + done_buy_size - done_sell_size
+        self.temp_inventory += done_buy_size - done_sell_size
+        
+        self.temp_capital -= b_p * remaining_buy_size
+        self.temp_inventory -= remaining_sell_size
         self.portfolio[ticker] += done_buy_size - done_sell_size
 
         print(self.capital)
@@ -84,7 +91,7 @@ class Broker:
     def set_portfolio(self):
         for ticker in self.env.tickers_list:
             self.portfolio[ticker] = 0
-        print("portfolio set")
+        # print("portfolio set")
 
     def settlement(self, final):   #settlement action called at end of expiry
         for ticker in self.env.tickers_list:
@@ -114,7 +121,7 @@ class Broker:
         PL = ( self.capital + self.inventory * final ) - ( self.start_cash + self.start_amount * initial)
         return PL
 
-    def new_option(self):
+    def new_day(self):
         self.temp_capital = self.capital
         self.temp_inventory = self.inventory
 
