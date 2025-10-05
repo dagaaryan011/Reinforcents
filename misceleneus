@@ -1,0 +1,361 @@
+main
+import numpy as np
+from orderbook import OrderBook, Order, Side  
+from exchange import MarketExchange
+from agent import Agent          
+from noise import generate_daily_price_path
+from datetime import date,timedelta, datetime
+
+class Space:
+    def __init__(self, low, high, shape):
+        self.low = np.array([low])
+        self.high = np.array([high])
+        self.shape = shape
+
+
+class TradingEnvironment:
+
+    def __init__(self, start_date, start_cash=3500000, active_ticker_count=5):
+        
+        self.current_date = start_date
+        self.current_step = 0
+        self.daily_price_path = generate_daily_price_path(start_date)
+        while self.daily_price_path is None:
+        
+            self.current_date += timedelta(days=1)
+            self.daily_price_path = self._get_daily_price_path(self.current_date)
+    
+        
+        initial_price = self.daily_price_path[0]
+        self.market = MarketExchange(underlying_price=initial_price)
+        
+        self.active_ticker_count = active_ticker_count 
+        self.active_tickers = [] 
+        self.initial_cash = start_cash
+        self.cash_balance = start_cash
+        self.portfolio = {ticker[0]: 0 for ticker in self.market.tickers}
+
+        self.state_dimensions = 1 + (self.active_ticker_count * 5)
+        self.n_actions = self.active_ticker_count + 1
+        self.input_dims= self.active_ticker_count + 1
+        self.action_space = Space(low=-1.0, high=1.0, shape=(self.n_actions,))
+        self.strike_interval = 5
+        self.option_depth = 6
+        self.update_active_tickers()
+
+
+
+    def update_active_tickers(self):
+        
+        underlying_price = self.market.underlying_price
+        
+        
+        all_options = [t for t in self.market.tickers if t[0] != 'STOCK_UNDERLYING']
+        
+        
+        all_options.sort(key=lambda t: abs(t[1] - underlying_price))
+        
+         
+        closest_options = [t[0] for t in all_options[:self.active_ticker_count - 1]]
+        
+        self.active_tickers = ['STOCK_UNDERLYING'] + closest_options
+
+
+    def reward(portfolio):
+        pass
+    def reset(self, new_date):
+        self.current_date = new_date
+        self.current_step = 0
+        self.daily_price_path = generate_daily_price_path(new_date)
+
+        if self.daily_price_path is None :
+            return None
+
+        opening_price = self.daily_price_path[0]
+        self.market = MarketExchange(underlying_price=opening_price,
+                                     interval=self.strike_interval,
+                                     option_depth=self.option_depth)
+    
+        self.update_active_tickers()
+
+        return self.get_state()
+
+    
+
+
+    def get_state(self):
+        state = np.full(self.state_dimensions, -1.0)
+
+        state[0] = self.cash_balance
+
+        pointer = 1
+
+        for ticker_name in self.active_tickers:
+            position_size = self.portfolio.get(ticker_name, 0)
+
+            book = self.market.get_book(ticker_name)
+            if book:
+                bids = book.get_bids(agent_type='retail')
+                asks = book.get_asks(agent_type='retail')
+
+                best_bid_price = bids[0][0] if bids else -1.0
+                best_bid_size = bids[0][1] if bids else -1.0
+                best_ask_price = asks[0][0] if asks else -1.0
+                best_ask_size = asks[0][1] if asks else -1.0
+            else:
+                best_bid_price, best_bid_size, best_ask_price, best_ask_size = -1.0, -1.0, -1.0, -1.0
+
+            state[pointer] = position_size
+            state[pointer + 1] = best_bid_price
+            state[pointer + 2] = best_bid_size
+            state[pointer + 3] = best_ask_price
+            state[pointer + 4] = best_ask_size
+
+            pointer += 5
+
+        return state
+
+    def step(self, raw_action):
+        ticker_probabilities = raw_action[:27]  
+        buyOrsell = raw_action[27]    
+        
+        
+        chosen_ticker_index = np.argmax(ticker_probabilities)
+        ticker_to_trade = self.market.tickers[chosen_ticker_index][0] 
+
+        
+        side = Side.BUY if buyOrsell > 0 else Side.SELL
+        
+        trade_size = 10 
+
+        
+        old_portfolio_value = self._calculate_portfolio_value()
+        
+        target_book = self.market.get_book(ticker_to_trade)
+        if target_book:
+            
+            price = target_book.get_asks()[0][0] if side == Side.BUY else target_book.get_bids()[0][0]
+            
+            order = Order(side=side, price=price, size=trade_size, owner_id='AGENT_01')
+            
+            
+            executed_trades = target_book.add_order(order)
+            
+            
+            for trade in executed_trades:
+                cost = trade.price * trade.size
+                if trade.taker_side == Side.BUY:
+                    self.cash_balance -= cost
+                    self.portfolio[trade.ticker_id] += trade.size
+                else:
+                    self.cash_balance += cost
+                    self.portfolio[trade.ticker_id] -= trade.size
+        
+        
+        new_portfolio_value = self.calculate_portfolio_value()
+        reward = new_portfolio_value - old_portfolio_value
+        
+        next_state = self.get_state()
+        
+        # done ka logic sochlena pls pls pls
+        # sochliya👍
+        end_of_day = self.current_step >= len(self.daily_price_path) - 1
+        is_bankrupt = self.calculate_portfolio_value() < (self.initial_cash * 0.5)
+
+        done = end_of_day or is_bankrupt
+
+        return next_state, reward, done 
+        
+        
+
+    def calculate_portfolio_value(self):
+        value = self.cash_balance
+        
+
+        for ticker_name, quantity in self.portfolio.items():
+    
+           
+            if quantity > 0:
+                
+                book = self.market.get_book(ticker_name)
+        
+                if book:
+                    bids = book.get_bids(agent_type='institutional')
+                    if bids:
+                        current_price = bids[0][0]
+                        value += quantity * current_price
+
+        return value 
+        # 1.loop through apne tickers
+        # 2.ticker ka quantity dekho , if >0 then orderbook mangao
+        # 3.orderbook mei best bid dekho
+        # 4.quantity*bestbid karo
+        # 5.add karo to cash
+        # 6.return karo.
+        
+
+    
+# --- Main execution block ---
+
+import matplotlib.pyplot as plt
+
+def plot_learning_curve(scores, filename='ddpg_learning_curve.png'):
+    """
+    Plots the scores over episodes and saves the figure.
+    """
+    # Create an array for the x-axis (episodes)
+    x = [i+1 for i in range(len(scores))]
+    
+    # Calculate a running average of the last 100 scores to see the trend
+    running_avg = np.zeros(len(scores))
+    for i in range(len(running_avg)):
+        running_avg[i] = np.mean(scores[max(0, i-100):(i+1)])
+        
+    plt.figure(figsize=(12, 6))
+    plt.plot(x, running_avg)
+    plt.title('Running Average of Previous 10 Scores')
+    plt.xlabel('Episode')
+    plt.ylabel('Average Score (Profit/Loss)')
+    plt.grid(True)
+    plt.savefig(filename) # Save the plot to a file
+    plt.show() # Display the plot
+
+
+if __name__ == '__main__':
+    current_date = date(2023, 2, 1)
+    # start_date = datetime.strptime( '2024-07-25', '%Y-%m-%d')
+    # current_date = start_date
+
+    env = TradingEnvironment(current_date)    
+    agent = Agent(input_dims=[env.state_dimensions],
+                  env=env, 
+                  n_actions=env.n_actions)
+    
+    n_episodes = 5
+    observation = env.reset(current_date)
+    print("--- Setup Complete ---")
+    print(f"State space dimensions: {[env.state_dimensions]}")
+    print(f"Number of actions: {env.n_actions}")
+    print(f"Action space low: {env.action_space.low}, high: {env.action_space.high}")
+    
+    score_history = []
+    
+    for i in range(n_episodes):
+        
+        
+        daily_price_path = generate_daily_price_path(current_date)
+        while daily_price_path is None:
+            print(f"Skipping non-trading day: {current_date}")
+            current_date += timedelta(days=1) # Move to the next day
+            daily_price_path = generate_daily_price_path(current_date)
+        
+        observation = env.reset(current_date)    
+        startingstockprice = daily_price_path[0]
+        # print (f'Portfolio at the start of day = {env.shares_held*startingstockprice + env.cash_balance:.2f}')
+        done = False
+        score = 0
+        
+        while not done:
+            action = agent.choose_action(observation)
+            
+            observation_, reward, done = env.step(action)
+            
+            
+            
+            agent.remember(observation, action, reward, observation_, done)
+            
+            agent.learn()
+            
+            
+            observation = observation_
+            score += reward
+        
+
+        score_history.append(score)
+        
+        # Print the results for this episode
+        print(f'Episode {i+1} for date {current_date}')
+        print(f'Shares held {env.shares_held}, Trading capital {env.cash_balance:.2f}')
+        closing_price = daily_price_path[-1]
+        
+        print(f"Day's Closing Price: {closing_price:.2f}")
+        print (f'Portfolio at the end of day = {env.shares_held*closing_price + env.cash_balance:.2f}')
+        current_date += timedelta(days=1)
+        
+        
+        # print(f'current share price {env.current_price}')
+    #    ...
+    print("\n--- Training Samaptam ---")
+    Initial_price = startingstockprice
+    initial_porfolio = 3500000 
+    final_price = env.order_book.market_price 
+    final_portfolio_value = env.calculate_portfolio_value()
+    print(f"Initial Portfolio -> {initial_porfolio}")
+    print(f"Final Portfolio Value: {final_portfolio_value:.2f}")
+    print (f'income-> {final_portfolio_value - initial_porfolio :.2f}')
+    plot_learning_curve(score_history)
+
+
+
+
+
+    step function
+    def step(self, raw_action):
+        self.current_step += 1
+        if self.current_step >= len(self.daily_price_path):
+            return self.get_state(), 0, True
+
+        new_underlying_price = self.daily_price_path[0]
+        self.market.update_market(new_underlying_price)
+        self._update_active_tickers()
+
+        old_portfolio_value = self.calculate_portfolio_value()
+        
+        
+        ticker_probabilities = raw_action[:self.n_tickers]
+        size_and_direction = raw_action[self.n_tickers]
+        chosen_ticker_index = np.argmax(ticker_probabilities)
+        ticker_to_trade = self.active_tickers[chosen_ticker_index]
+        side = Side.BUY if size_and_direction > 0 else Side.SELL
+        requested_size = 10 
+        
+        trade_size = requested_size
+        if side == Side.SELL:
+            current_holding = self.portfolio.get(ticker_to_trade, 0)
+            trade_size = min(requested_size, current_holding)
+        
+       
+       
+        if trade_size > 0:
+            target_book = self.market.get_book(ticker_to_trade)
+            if target_book:
+                bids = target_book.get_bids()
+                asks = target_book.get_asks()
+                price = -1
+                if side == Side.BUY and asks: price = asks[0][0]
+                elif side == Side.SELL and bids: price = bids[0][0]
+
+                if price != -1:
+                    order = Order(side=side, price=price, size=trade_size, owner_id='AGENT_01')
+                    executed_trades = target_book.add_order(order)
+                    for trade in executed_trades:
+                        cost = trade.price * trade.size
+                        if trade.taker_side == Side.BUY:
+                            self.cash_balance -= cost
+                            self.portfolio[trade.ticker_id] += trade.size
+                        else:
+                            self.cash_balance += cost
+                            self.portfolio[trade.ticker_id] -= trade.size
+        
+        
+
+        new_portfolio_value = self.calculate_portfolio_value()
+        reward = new_portfolio_value - old_portfolio_value-new_portfolio_value*0.003
+        next_state = self.get_state()
+        
+        end_of_day = self.current_step >= len(self.daily_price_path) - 1
+        is_bankrupt = new_portfolio_value < (self.initial_cash * 0.5)
+        done = end_of_day or is_bankrupt
+
+        return next_state, reward, done
+    
