@@ -29,6 +29,7 @@ class Env:
         self.thetas = {}
         self.vegas = {}
 
+        self.volatility = 0
         self.time_to_expiry = 0
         self.CMF = 0
         self.days_passed = 0
@@ -46,12 +47,21 @@ class Env:
         t = self.thetas[ticker]
         v = self.vegas[ticker]
         ti = self.time_to_expiry
-        return [cmf, hb, la, s, m, pr, d, g, t, v, ti]
+        vo = self.volatility
+        return [cmf, hb, la, s, m, pr, d, g, t, v, ti, vo]
 
 
     def get_trend(self, price):
         self.trend.append(price)
         self.mins_passed += 1
+
+    def get_volatility(self):
+        if len(self.trend)<30:
+            trend = self.trend
+        else:
+            trend = self.trend[-30:]
+        trend = np.array(trend)
+        self.volatility = np.std(trend)
 
     def get_open_high_close_low(self):
         open = self.trend[0]
@@ -173,7 +183,8 @@ class Env:
     def every_min(self):
         self.get_highestbid_lowestask_dict()
         self.get_spread_and_mid_dict()
-        self.get_premium_and_greek_dict(self.trend[0])
+        self.get_premium_and_greek_dict(self.trend[-1])
+        self.get_volatility()
 
     def action_at_expiry(self):
         self.exchange = None

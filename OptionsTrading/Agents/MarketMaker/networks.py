@@ -10,7 +10,7 @@ class Selector(nn.Module):
     def __init__(self):
         super(Selector, self).__init__()
         
-        self.indiv1 = nn.Linear(14, 16)
+        self.indiv1 = nn.Linear(15, 16)
         self.indiv2 = nn.Linear(16, 8)
         self.indiv3 = nn.Linear(8, 4)
         self.indiv4 = nn.Linear(4, 2)
@@ -54,7 +54,7 @@ class CriticNetwork(nn.Module):
     def __init__(self):
         super(CriticNetwork, self).__init__()
 
-        self.fc1 = nn.Linear(14 + 4, 32) 
+        self.fc1 = nn.Linear(15 + 4, 32) 
         self.fc2 = nn.Linear(32, 32)
         self.q = nn.Linear(32, 1)
 
@@ -71,7 +71,7 @@ class ValueNetwork(nn.Module):
     def __init__(self):
         super(ValueNetwork, self).__init__()
         # Input size is state_size (15)
-        self.fc1 = nn.Linear(14, 32)
+        self.fc1 = nn.Linear(15, 32)
         self.fc2 = nn.Linear(32, 32)
         self.v = nn.Linear(32, 1)
 
@@ -88,7 +88,7 @@ class ActorNetwork(nn.Module):
         super(ActorNetwork, self).__init__()
         self.n_actions = 4
         
-        self.fc1 = nn.Linear(14, 32)
+        self.fc1 = nn.Linear(15, 32)
         self.fc2 = nn.Linear(32, 16)
         self.fc3 = nn.Linear(16, 8) 
         
@@ -119,6 +119,6 @@ class ActorNetwork(nn.Module):
         
         log_probs = probabilities.log_prob(action)
         
-        log_probs = torch.logsumexp(log_probs, dim=1, keepdim=True)
+        log_probs = log_probs.sum(dim=1, keepdim=True)
         
         return action, log_probs

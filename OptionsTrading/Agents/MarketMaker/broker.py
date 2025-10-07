@@ -76,6 +76,7 @@ class Broker:
         self.temp_inventory -= remaining_sell_size
         self.portfolio[ticker] += done_buy_size - done_sell_size
 
+        print(b_p, a_p, b_s, a_s)
         print(self.capital)
         print(self.temp_capital)
         print(self.inventory)

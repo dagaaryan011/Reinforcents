@@ -30,6 +30,7 @@ class MarketMaker:
         self.memory_size = 200
         self.batch_times = 10
         self.selectstates = [0] * self.memory_size
+        self.max_volume_idxs = [0] * self.memory_size
         self.states = [0] * self.memory_size
         self.actions = [0] * self.memory_size
         self.rewards = [0] * self.memory_size
@@ -115,15 +116,12 @@ class MarketMaker:
         self.selectstates[i] =allstates
         selection = self.select(allstates)
         probabilities = F.softmax(selection, dim=1).squeeze(0).detach().numpy()
-        print(selection)
+        # print(selection)
+        idx = np.random.choice(24, p=probabilities)
+        volumes_highest_index = self.assign_volumes()
+        self.max_volume_idxs[i] = volumes_highest_index
 
-        random = np.random.rand()    # greedy
-        if random < self.epsilon:
-            idx = np.random.randint(0,24)
-        else :
-            idx = np.random.choice(24, p=probabilities)
-
-        print(idx)
+        # print(idx)
         ticker = self.broker.env.tickers_list[idx]   # get the chosen ticker
 
         state = self.broker.get_actual_state(ticker)
@@ -176,7 +174,7 @@ class MarketMaker:
     
     def decide_values(self, action, highest_bid, lowest_ask):
         action_values = action[0]
-        # print(action_values)
+        print(action_values)
         size = min(self.broker.temp_inventory, 10)
         price = min((lowest_ask - highest_bid)/2, self.broker.temp_capital)
         bid_price = highest_bid + action_values[0] * price
@@ -193,8 +191,6 @@ class MarketMaker:
         diff_ask = abs(lowest_ask - ask_price)
         reward = PL - diff_bid - diff_ask
         size_diff = bid_size - ask_size
-        self.broker.temp_capital+=PL
-        self.broker.temp_inventory += size_diff
         return reward
     
     def assign_settlements(self, final):
@@ -226,17 +222,18 @@ class MarketMaker:
         # return expiry_volumes
 
     def sample_batch(self):
-        allstates, states, actions, rewards, new_states = [], [], [], [], []
+        allstates, volume_idxs, states, actions, rewards, new_states = [], [], [], [], [], []
         max_mem = min(self.t, self.memory_size)
         for _ in range(self.batch_size):
             j = np.random.randint(0, max_mem)
             allstates.append(self.selectstates[j])
+            volume_idxs.append(self.max_volume_idxs[j])
             states.append(self.states[j])
             actions.append(self.actions[j])
             rewards.append(self.rewards[j])
             new_states.append(self.new_states[j])
 
-        return allstates, states, actions, rewards, new_states
+        return allstates, volume_idxs, states, actions, rewards, new_states
 
 
     def update_network_parameters(self):
@@ -255,19 +252,15 @@ class MarketMaker:
 
         for k in range(0,self.batch_times):
             
-            all_states_list_of_samples, states, actions, rewards, new_states = self.sample_batch()
+            all_states_list_of_samples, max_vol_idxs, states, actions, rewards, new_states = self.sample_batch()
 
             states = torch.tensor(states, dtype=torch.float)
             states_ = torch.tensor(new_states, dtype=torch.float)
             actions = torch.tensor(actions, dtype=torch.float)
             actions = torch.squeeze(actions, 1)
             rewards = torch.tensor(rewards, dtype=torch.float)
-            expiry_volumes = torch.tensor(self.expiry_volumes, dtype=torch.float)
-            expiry_volumes = expiry_volumes.unsqueeze(0) 
-            expiry_volumes = expiry_volumes.expand(self.batch_size, -1)
 
-            target_index = self.expiry_volumes_highest_index
-            target_labels = torch.full((self.batch_size,), target_index, dtype=torch.long)
+            target_idxs  = torch.tensor(max_vol_idxs)
 
             all_states_tensor = torch.tensor(all_states_list_of_samples, dtype=torch.float) 
             t = torch.unbind(all_states_tensor, axis=1) 
@@ -280,7 +273,7 @@ class MarketMaker:
 
             # SELECTOR UPDATE
             self.selector.optimizer.zero_grad()
-            selector_loss = F.cross_entropy(logits, target_labels)
+            selector_loss = F.cross_entropy(logits, target_idxs)
             selector_loss.backward(retain_graph=True)
             self.selector.optimizer.step()
 
