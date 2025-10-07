@@ -46,3 +46,15 @@ DECISION_FREQUENCY = 30
 
 #lot size for the options
 LOT_SIZE = 50
+
+
+
+#insti
+
+LONG_TERM_INDICATORS = ['rsi', 'stoch', 'adx', 'status']
+SHORT_TERM_INDICATORS = ['macd', 'rsi', 'stoch']
+
+NUM_LONG_TERM_FEATURES = len(LONG_TERM_INDICATORS)
+NUM_SHORT_TERM_FEATURES = len(SHORT_TERM_INDICATORS)
+NUM_LONG_TERM_OUTPUTS = 3 # Trend classes
+NUM_ACTIONS = 11 # Example: Number of tickers the DDPG agent can trade

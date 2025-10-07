@@ -1,3 +1,4 @@
+
 import numpy as np
 import matplotlib.pyplot as plt
 import yfinance as yf
@@ -9,7 +10,7 @@ def generate_daily_price_path(current_date):
     Returns a NumPy array of price samples.
     """
     # Define the stock ticker and the date for simulation
-    ticker = 'NESTLEIND.NS'
+    ticker = 'RELIANCE.NS'
 #     start_date_str =
 
 # # Convert the string to a datetime object
@@ -56,8 +57,11 @@ def generate_daily_price_path(current_date):
     # Apply high and low constraints
     path_high = np.max(simulated_path)
     path_low = np.min(simulated_path)
-
-    scale = (high_price - low_price) / (path_high - path_low)
+    if path_high ==path_low:
+        scale = 0
+    else:
+        scale = (high_price - low_price) / (path_high - path_low)
+    
     shift = low_price - (path_low * scale)
 
     constrained_path = simulated_path * scale + shift

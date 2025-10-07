@@ -2,7 +2,7 @@ import os
 import pandas as pd
 from datetime import date, timedelta
 from tqdm import tqdm
-from noise import generate_price_samples # Make sure noise.py is in the same folder
+from src.market.noise import generate_price_samples # Make sure noise.py is in the same folder
 
 def create_test_csv(filename="test_price_data.csv", days_to_fetch=60):
     """

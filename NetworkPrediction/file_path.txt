@@ -1,29 +1,41 @@
+NETWORKPREDICTION/
+├── configs/
+│   └── retail_agent.json
+│
 ├── data/
-│   ├── models/
-│   │   └── universal_model.keras
-│   └── training_data/
-│       └── training_data_1.npy
+│   └── models/
+│       ├── mm_agents/
+│       │   ├── actor_MM_1.pt
+│       │   ├── critic_1_MM_1.pt
+│       │   └── ... (all other .pt files)
+│       │
+│       └── retail_agents/
+│           └── agent_model_0.keras
 │
 ├── src/
-│   ├── __init__.py
-│   ├── agent/
-│   │   ├── __init__.py
-│   │   └── agent.py
+│   ├── agents/
+│   │   ├── retail/
+│   │   │   ├── agent_retail.py
+│   │   │   └── agent_retail_env.py
+│   │   └── market_maker/
+│   │       ├── agent_mm.py
+│   │       ├── broker_mm.py
+│   │       ├── environment_mm.py
+│   │       └── network_mm.py
 │   │
 │   ├── market/
-│   │   ├── __init__.py
+│   │   ├── blackscholes.py      
 │   │   ├── exchange.py
+│   │   ├── noise.py
 │   │   ├── orderbook.py
-│   │   └── ...
+│   │   ├── stockprice.py
+│   │   └── trade_records.py
 │   │
-│   ├── utils/
-│   │   ├── __init__.py
-│   │   └── functions.py
-│   │
-│   ├── data_processor.py
-│   └── model_setup.py
+│   └── utils/
+│       └── functions.py
 │
-├── config.py
 ├── main.py
-├── train.py
-└── requirements.txt
+├── train_retail.py
+|── train_mm.py
+└── train_retail.py
+└── train_insti.py

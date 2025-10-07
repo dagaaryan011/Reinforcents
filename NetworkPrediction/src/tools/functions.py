@@ -84,10 +84,10 @@ def get_rsi_signal(rsi_history: list[float], window_size: int = 30):
     if oversold > overbought: return -1
     return 0
 
-def get_rsi_conviction(rsi_history,coeffs:list):
-    rsi_short = get_rsi_signal(rsi_history,window_size=10)
-    rsi_med = get_rsi_signal(rsi_history,window_size=30)
-    rsi_long = get_rsi_signal(rsi_history,window_size=60)
+def get_rsi_conviction(rsi_history,coeffs:list,window_size:tuple = (10,30,60)):
+    rsi_short = get_rsi_signal(rsi_history,window_size=window_size[0])
+    rsi_med = get_rsi_signal(rsi_history,window_size=window_size[1])
+    rsi_long = get_rsi_signal(rsi_history,window_size=window_size[2])
     rsi_conviction = rsi_short*coeffs[0] + rsi_med*coeffs[1] + rsi_long*coeffs[2]
     if rsi_conviction > 0.9: return 1.5
     elif rsi_conviction < (-0.9): return -1.5
@@ -109,10 +109,10 @@ def get_stochastic_signal(k_history: list[float],d_history:list[float], window_s
     if oversold > overbought: return -1
     return 0
     
-def get_stoch_conviction (k_history:list[float],d_history:list[float],coeffs:list):
-    stoch_short = get_stochastic_signal(k_history, d_history, window_size=10)
-    stoch_med = get_stochastic_signal(k_history, d_history, window_size=30)
-    stoch_long = get_stochastic_signal(k_history, d_history, window_size=60)
+def get_stoch_conviction (k_history:list[float],d_history:list[float],coeffs:list,window_size:tuple = (10,30,60)):
+    stoch_short = get_stochastic_signal(k_history, d_history, window_size=window_size[0])
+    stoch_med = get_stochastic_signal(k_history, d_history, window_size=window_size[1])
+    stoch_long = get_stochastic_signal(k_history, d_history, window_size=window_size[2])
     stoch_conviction = coeffs[0]*stoch_med + coeffs[1]*stoch_long + coeffs[2]*stoch_short
     if stoch_conviction > 0.9: return 1.5
     elif stoch_conviction < (-0.9): return -1.5
@@ -160,7 +160,7 @@ def get_DX(DMpos_history:list[float] , DMneg_history:list[float], true_range_his
     smooth_negDM = Indicators.EMA_n(DMneg_history, n=14)
     avgTR = Indicators.EMA_n(true_range_history, n=14)
     if smooth_posDM is None or smooth_negDM is None or avgTR is None or avgTR == 0:
-        return None
+        return 0.0
     DIpos = 100 * (smooth_posDM / avgTR)
     DIneg = 100 * (smooth_negDM / avgTR)
     if (DIpos + DIneg) == 0:
@@ -173,3 +173,29 @@ def get_ADX(dx_history:list[float]):
         return None
     adx = Indicators.EMA_n(dx_history , n = 14)
     return adx
+def calculate_historical_volatility(price_history: list, window: int = 30) -> float:
+    """
+    Calculates the annualized historical volatility over a given window.
+    
+    Returns:
+        float: Annualized volatility, or a default value if not enough data.
+    """
+    # Use a default volatility if history is too short
+    if len(price_history) < window + 1:
+        return 0.20 # Default 20% volatility
+
+    # Get the most recent 'window' of prices
+    prices = np.array(price_history[-window:])
+    
+    # Calculate daily log returns
+    log_returns = np.log(prices[1:] / prices[:-1])
+    
+    # Calculate the standard deviation of log returns
+    daily_std_dev = np.std(log_returns)
+    
+    # Annualize the volatility (assuming daily data for simplicity)
+    # If your steps are minutes, this number would be much larger.
+    # e.g., sqrt(252 * 375) for 375 minutes in a trading day.
+    annualized_volatility = daily_std_dev * np.sqrt(252) 
+    
+    return annualized_volatility

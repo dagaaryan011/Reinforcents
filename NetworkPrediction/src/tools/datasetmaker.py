@@ -179,7 +179,7 @@ def get_DX(DMpos_history:list[float] , DMneg_history:list[float], true_range_his
     if (DIpos + DIneg) == 0:
         return 0.0
 
-    dx = 100 * abs(DIpos - DIneg) / (DIpos + DIneg)
+    dx = abs(DIpos - DIneg) / (DIpos + DIneg)
     return dx
 def get_ADX(dx_history:list[float]):
     adx = Indicators.EMA_n(dx_history , n = 14)
@@ -283,6 +283,8 @@ def create_training_dataset(price_path, sequence_length=30):
         else:
              d_history.append(None)
 
+        # --- REPLACE IT WITH THIS ---
+
         if i >= min_warmup:
             true_range_history.append(get_true_range(trend))
             dx_history.append(get_DX(DMpos_history=DMpos_history, DMneg_history=DMneg_history, true_range_history=true_range_history))
@@ -290,16 +292,18 @@ def create_training_dataset(price_path, sequence_length=30):
             rsi_sig = get_rsi_conviction(rsi_history)
             stoch_sig = get_stoch_conviction(k_history, d_history)
             status_sig = get_current_status(trend)
-            adx_sig = get_ADX(dx_history=dx_history)
-            
-            inputs = [
-                macd_sig if macd_sig is not None else 0,
-                rsi_sig if rsi_sig is not None else 0.0,
-                stoch_sig if stoch_sig is not None else 0.0,
-                status_sig if status_sig is not None else 0.0,
-                adx_sig if adx_sig is not None else 0.0
-            ]
-            all_features.append(inputs)
+            adx_sig = get_ADX(dx_history)
+
+            # This corrected logic checks for both None and NaN
+            all_signals = [macd_sig, rsi_sig, stoch_sig, status_sig, adx_sig]
+            sanitized_features = []
+            for value in all_signals:
+                if value is None or np.isnan(value):
+                    sanitized_features.append(0.0)
+                else:
+                    sanitized_features.append(value)
+
+            all_features.append(sanitized_features)
         else:
             all_features.append([0, 0.0, 0.0, 0.0, 0.0])
             true_range_history.append(None)
@@ -320,7 +324,7 @@ if __name__ == '__main__':
     current_date = start_date
     
     full_price_path = []
-    full_price_path = pd.read_csv("test_price_data.csv")['price'].tolist()
+    full_price_path = pd.read_csv(r"D:\NetworkPrediction\misceleaneous\test_price_data.csv")['price'].tolist()
     total_days = (end_date - start_date).days
 
     # print(f"Fetching 5 years of data from {start_date} to {end_date}...")
@@ -346,7 +350,7 @@ if __name__ == '__main__':
         end_index = (i + 1) * x
         price_subset = full_price_path[start_index:end_index]
         dataset_subset = create_training_dataset(price_subset)
-        np.save(rf'D:\NetworkPrediction\training_data\training_data{i+1}.npy', dataset_subset)
+        np.save(rf'D:\NetworkPrediction\data\training_data\training_data{i}.npy', dataset_subset)
     print("\n--- Dataset Generation Complete ---")
     
     
