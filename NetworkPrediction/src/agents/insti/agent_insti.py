@@ -3,6 +3,7 @@ import torch
 import torch.nn.functional as F
 from collections import deque
 import random
+import os
 
 # Correctly import from the new network file and model_setup file
 from .network_insti_pytorch import CriticNetwork, ActorNetwork
@@ -116,7 +117,31 @@ class Agent_Insti:
         # Soft update for Critic
         for target_param, param in zip(self.target_critic.parameters(), self.critic.parameters()):
             target_param.data.copy_(tau * param.data + (1.0 - tau) * target_param.data)
-
+    def save_models(self, slot: int):
+        """Save Actor and Critic networks to specific slot (0-9)"""
+        base_path = r"D:\NetworkPrediction\data\models\Insti"
+        os.makedirs(base_path, exist_ok=True)
+        
+        torch.save(self.actor.state_dict(), os.path.join(base_path, f'Actor{slot}.pth'))
+        torch.save(self.critic.state_dict(), os.path.join(base_path, f'Critic{slot}.pth'))
+        torch.save(self.target_actor.state_dict(), os.path.join(base_path, f'TargetActor{slot}.pth'))
+        torch.save(self.target_critic.state_dict(), os.path.join(base_path, f'TargetCritic{slot}.pth'))
+        
+        print(f"Agent {self.agent_id}: DDPG models saved to slot {slot}")
+    
+    def load_models(self, slot: int):
+        """Load networks from specific slot"""
+        base_path = r"D:\NetworkPrediction\data\models\Insti"
+        
+        try:
+            self.actor.load_state_dict(torch.load(os.path.join(base_path, f'Actor{slot}.pth')))
+            self.critic.load_state_dict(torch.load(os.path.join(base_path, f'Critic{slot}.pth')))
+            self.target_actor.load_state_dict(torch.load(os.path.join(base_path, f'TargetActor{slot}.pth')))
+            self.target_critic.load_state_dict(torch.load(os.path.join(base_path, f'TargetCritic{slot}.pth')))
+            
+            print(f"Agent {self.agent_id}: Models loaded from slot {slot}")
+        except FileNotFoundError:
+            print(f"Agent {self.agent_id}: No saved models found in slot {slot}")
     def get_rnn_context(self):
         if len(self.long_term_feature_window) < SEQUENCE_LENGTH:
             return None, None

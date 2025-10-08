@@ -353,6 +353,7 @@ class Trade:
         self.ticker_id = ticker_id
         self.timestamp = timestamp
         self.taker_side = None
+        self.maker_side = None
 
     def __repr__(self):
         return f"Trade({self.ticker_id}, P:{self.price}, S:{self.size})"
@@ -462,6 +463,7 @@ class OrderBook:
             trade_size = min(incoming_order.size, book_order.size)
             new_trade = Trade(incoming_order.owner_id, book_order.owner_id, price, trade_size, self.ticker_id, time.time())
             new_trade.taker_side = incoming_order.side
+            new_trade.maker_side = book_order.side
             trades.append(new_trade)
             self.ledger.record_trade(new_trade)
             
@@ -469,8 +471,8 @@ class OrderBook:
             book_order.size -= trade_size
             
             maker_id = book_order.owner_id
-            if maker_id != 'LIQUIDITY_PROVIDER':
-                self.notifications[maker_id].append(new_trade)
+            # if maker_id != 'LIQUIDITY_PROVIDER':
+            self.notifications[maker_id].append(new_trade)
         
         levels[price] = [o for o in orders_at_level if o.size > 0]
         return trades

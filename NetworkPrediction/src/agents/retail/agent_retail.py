@@ -2,13 +2,13 @@
 
 import numpy as np
 from collections import deque
-import tensorflow as tf
+
 import random
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from src.model_resources.model import Network_Utils
-
+import os
 # Import utilities and configuration
 from ...tools.functions import (
     Indicators, 
@@ -21,17 +21,37 @@ from ...tools.functions import (
     get_DX, 
     get_ADX
 )
-from config import SEQUENCE_LENGTH,FEATURE_LIST,AGENT_FPERSONALITIES
+from config import SEQUENCE_LENGTH,FEATURE_LIST,AGENT_FPERSONALITIES,PERSONALITY_MODEL_NAMES,MODEL_BASE_PATH
+PERSONALITY_MODEL_PATHS = {
+    tuple(['macd', 'rsi', 'stoch']):              r"D:\NetworkPrediction\data\models\retail\Momentum Trader.pth",
+    tuple(['rsi', 'adx', 'status']):              r"D:\NetworkPrediction\data\models\retail\Trend Follower.pth",
+    tuple(['macd', 'stoch', 'status']):           r"D:\NetworkPrediction\data\models\retail\Hybrid Trader.pth",
+    tuple(['macd', 'rsi', 'stoch', 'adx', 'status']): r"D:\NetworkPrediction\data\models\retail\All-Rounder.pth",
+}
 
 class Agent:
-    def __init__(self, agent_id: int, model_path:str):
+    def __init__(self, agent_id: int):
         
         self.agent_id = agent_id
         self.main_network = Network_Utils()
-        self.main_network.load_model(model_path)
+        
+        # --- Choose a random trading personality ---
         self.indicator_focus = random.choice(AGENT_FPERSONALITIES)
-        
-        
+
+        # --- Determine model path automatically ---
+        for name, indicators in PERSONALITY_MODEL_NAMES.items():
+            if sorted(indicators) == sorted(self.indicator_focus):
+                model_path = os.path.join(MODEL_BASE_PATH, f"{name}.pth")
+                break
+
+        # --- Build and load model ---
+        self.main_network = Network_Utils()
+        self.main_network.load_model(model_path)
+
+        print(f"--- Initialized Agent {self.agent_id} with focus: {self.indicator_focus} ---")
+        print(f"--- Loaded model from: {model_path} ---")
+
+
         rand_rsi = np.random.rand(3); self.rsi_coeffs = rand_rsi / np.sum(rand_rsi)
         rand_stoch = np.random.rand(3); self.stoch_coeffs = rand_stoch / np.sum(rand_stoch)
             

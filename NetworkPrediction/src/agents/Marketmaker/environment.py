@@ -205,6 +205,7 @@ class Env:
         self.time_to_expiry = time
         if self.days_passed <= 0 and self.mins_passed <= 0 :
             self.get_tickers_strikes_list()
+            #print(self.tickers_list)
             self.set_total_volumes_dict()
             self.get_trend(price)
             # print("first, first", self.days_passed, self.mins_passed)
@@ -224,16 +225,17 @@ class Env:
 
 def run(agent, env):
     if env.days_passed <= 0 and env.mins_passed <= 1 :    #first day first min
+        agent.broker.reset_portfolio()
         agent.broker.set_portfolio()
-        # print(" agent, first, first", env.days_passed, env.mins_passed)
+        #print(" agent, first, first", env.days_passed, env.mins_passed)
     elif env.days_passed > 0 and env.mins_passed <= 1 :     # other day first min
         agent.broker.new_day() 
-        # print(" agent, other, first", env.days_passed, env.mins_passed)    
+        #print(" agent, other, first", env.days_passed, env.mins_passed)    
     elif env.days_passed <= 0 :  
         pass                          # first day other mins
-        # print(" agent, first, other", env.days_passed, env.mins_passed)
+        #print(" agent, first, other", env.days_passed, env.mins_passed)
     else :                                                   # other day other mins
         agent.collect()
-        # print(" agent, other, other", env.days_passed, env.mins_passed)
+        #print(" agent, other, other", env.days_passed, env.mins_passed)
 
     

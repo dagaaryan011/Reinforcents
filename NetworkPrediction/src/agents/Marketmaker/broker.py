@@ -102,12 +102,12 @@ class Broker:
         self.temp_inventory -= remaining_sell_size
         self.portfolio[ticker] += done_buy_size - done_sell_size
 
-        print(b_p, a_p, b_s, a_s)
-        print(self.capital)
-        print(self.temp_capital)
-        print(self.inventory)
-        print(self.temp_inventory)
-        print(self.portfolio[ticker])
+        # print(b_p, a_p, b_s, a_s)
+        # print(self.capital)
+        # print(self.temp_capital)
+        # print(self.inventory)
+        # print(self.temp_inventory)
+        # print(self.portfolio[ticker])
 
         # return done_buy_price, done_sell_price, done_buy_size, done_sell_size
         
@@ -120,34 +120,60 @@ class Broker:
             self.portfolio[ticker] = 0
         # print("portfolio set")
 
-    def settlement(self, final):   #settlement action called at end of expiry
-        for ticker in self.env.tickers_list:
-            strike = self.env.strikes_dict[ticker]
-            amount = self.portfolio[ticker]
-            PL = 0
-            if amount < 0 :
-                if 'PE' in ticker :
-                    PL = final - strike
-                else :
-                    PL = strike - final
-                PL = min(0, PL) * abs(amount)
-            if amount > 0 :
-                if 'PE' in ticker :
-                    PL = strike - final
+    def settlement(self, final_price: float):
+        """Correct settlement logic for options"""
+        for ticker, amount in self.portfolio.items():
+            # if amount == 0:
+            #     continue
+
+            try:
+                # Extract strike price and option type safely
+                parts = ticker.split('_')
+                if len(parts) < 3:
+                    continue
+
+                strike_price = int(parts[1])
+                option_type = parts[2]  # 'CE' or 'PE'
+
+                settlement_value = 0
+
+                if amount > 0:  # LONG positions (we own options)
+                    if option_type == 'CE':  # Long Call
+                        settlement_value = max(0, final_price - strike_price)
+                    elif option_type == 'PE':  # Long Put
+                        settlement_value = max(0, strike_price - final_price)
+                    # Long positions GET money
+                    self.cash_settlement[ticker] = settlement_value * amount * LOT_SIZE
+
+                elif amount < 0:  # SHORT positions (we sold options)
+                    if option_type == 'CE':  # Short Call
+                        settlement_value = max(0, final_price - strike_price)
+                    elif option_type == 'PE':  # Short Put  
+                        settlement_value = max(0, strike_price - final_price)
+                    # Short positions PAY money (negative cash flow)
+                    self.cash_settlement[ticker] = -settlement_value * abs(amount) * LOT_SIZE
+                
                 else:
-                    PL = final-strike
-                PL = max(0, PL) * abs(amount)
-            self.cash_settlement[ticker] = PL
+                    self.cash_settlement[ticker] = 0
+            except (ValueError, IndexError):
+                print(f"Warning: Could not parse ticker {ticker}")
+                continue
 
     def settle(self):   #settlement action called at end of expiry
+        total_settlement = 0
         for ticker in self.env.tickers_list:
-            self.capital += self.cash_settlement[ticker]
+            total_settlement += self.cash_settlement[ticker]
+        self.capital += total_settlement
+        print("total settlement ", total_settlement)
 
 
     def get_PL(self, initial, final):
-        PL = ( self.capital + self.inventory * final ) - ( self.start_cash + self.start_amount * initial)
+        PL = ( self.capital  ) - ( self.start_cash )
         return PL
+        self.start_cash = self.capital
 
     def new_day(self):
         self.temp_capital = self.capital
         self.temp_inventory = self.inventory
+
+ 

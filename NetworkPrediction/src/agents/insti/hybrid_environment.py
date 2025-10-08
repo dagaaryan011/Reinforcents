@@ -121,48 +121,110 @@ class HybridAgentEnvironment:
             portfolio_state.append(self.portfolio.get(ticker, 0))
         return np.array(portfolio_state)
 
-    # In the HybridAgentEnvironment class
-
-    # In the HybridAgentEnvironment class
-
     def _execute_trade(self, action: np.ndarray):
         """
-        Places an order and IMMEDIATELY processes any resulting trades.
+        MINIMAL CHANGE: Just add confidence threshold to existing working logic
         """
         self._update_active_tickers()
-        # ... (code to determine ticker_to_trade, base_size, etc. remains the same) ...
+
+        # ORIGINAL LOGIC (that was working)
         max_action_index = np.argmax(np.abs(action))
         trade_strength = action[max_action_index]
         ticker_to_trade = self.active_tickers[max_action_index]
+
+        # NEW: Only trade if we have sufficient conviction
+        if abs(trade_strength) < 0.2:
+            return None
+
+        # REST OF ORIGINAL LOGIC...
         book = self.exchange.get_book(ticker_to_trade)
-        if not book: return None
-        base_size = int(np.round(abs(trade_strength) * 50))
-        if base_size < 1: return None
-    
-        executed_action_info = None
+        if not book: 
+            return None
+
         order_side = Side.BUY if trade_strength > 0 else Side.SELL
-        
-        # Determine the price based on the best available counter-offer
+
+        # Check if we can actually sell what we don't own
+        if order_side == Side.SELL and self.portfolio.get(ticker_to_trade, 0) <= 0:
+            return None
+
         if order_side == Side.BUY and book.get_asks():
             price = book.get_asks()[0][0]
         elif order_side == Side.SELL and book.get_bids():
             price = book.get_bids()[0][0]
         else:
-            # No counter-offer available, cannot execute an instant trade
             return None
-    
-        # Create and add the order, which returns a list of trades if successful
+
+        base_size = max(1, int(abs(trade_strength) * 50))
+
+        # Create and submit order
         order = Order(order_side, price, base_size, self.agent.agent_id)
         executed_trades = book.add_order(order)
-    
-        # --- NEW LOGIC: Process trades on the spot ---
+
+        # Process immediate fills
+        executed_action_info = None
         if executed_trades:
             executed_action_info = {'ticker': ticker_to_trade, 'side': order_side}
             for trade in executed_trades:
-                # Print the confirmation message immediately
+                print(f"    [TRADE CONFIRMED] Agent {self.agent.agent_id} -> {trade.taker_side.name} {trade.size} of {trade.ticker_id} @ {trade.price:.2f}")
+
+                # Update portfolio and cash immediately
+                cost = trade.price * trade.size * LOT_SIZE
+                if trade.taker_side == Side.BUY:
+                    self.portfolio[trade.ticker_id] += trade.size
+                    self.cash_balance -= cost
+                elif trade.taker_side == Side.SELL:
+                    self.portfolio[trade.ticker_id] -= trade.size
+                    self.cash_balance += cost
+
+                if self.portfolio.get(trade.ticker_id) == 0:
+                    del self.portfolio[trade.ticker_id]
+
+        return executed_action_info
+
+    def _is_fairly_priced(self, ticker: str) -> bool:
+        """
+        NEW: Simple fair value check similar to retail trader
+        """
+        book = self.exchange.get_book(ticker)
+        if not book or not book.get_asks():
+            return False
+            
+        # For now, just check if there's liquidity
+        # You can add the full Black-Scholes fair value calculation here later
+        best_ask = book.get_asks()[0][0]
+        return best_ask > 0.01  # Basic check - option has some value
+
+    def _submit_market_order(self, ticker: str, side: Side, strength: float):
+        """
+        NEW: Submit a market order based on signal strength
+        """
+        book = self.exchange.get_book(ticker)
+        if not book:
+            return None
+            
+        # Calculate position size based on signal strength
+        base_size = max(1, int(strength * 20))  # Scale with conviction (1-20 lots)
+        
+        # Determine price based on side
+        if side == Side.BUY and book.get_asks():
+            price = book.get_asks()[0][0]
+        elif side == Side.SELL and book.get_bids():
+            price = book.get_bids()[0][0]
+        else:
+            return None  # No liquidity
+            
+        # Create and submit order
+        order = Order(side, price, base_size, self.agent.agent_id)
+        executed_trades = book.add_order(order)
+        
+        # Process immediate fills
+        executed_action_info = None
+        if executed_trades:
+            executed_action_info = {'ticker': ticker, 'side': side}
+            for trade in executed_trades:
                 print(f"    [TRADE CONFIRMED] Agent {self.agent.agent_id} -> {trade.taker_side.name} {trade.size} of {trade.ticker_id} @ {trade.price:.2f}")
                 
-                # Update portfolio and cash balance immediately
+                # Update portfolio and cash immediately
                 cost = trade.price * trade.size * LOT_SIZE
                 if trade.taker_side == Side.BUY:
                     self.portfolio[trade.ticker_id] += trade.size
@@ -175,29 +237,51 @@ class HybridAgentEnvironment:
                     del self.portfolio[trade.ticker_id]
                     
         return executed_action_info
-    
+
+    # def _check_trade_confirmations(self):
+    #     """
+    #     Checks the notification mailbox for any PASSIVE orders that were filled
+    #     by other market participants.
+    #     """
+    #     for ticker_tuple in self.exchange.tickers:
+    #         book = self.exchange.get_book(ticker_tuple[0])
+    #         if book:
+    #             # This logic remains the same, handling passive fills
+    #             notifications = book.collect_notifications_for(self.agent.agent_id)
+    #             for trade in notifications:
+    #                 print(f"    [PASSIVE FILL] Agent {self.agent.agent_id}'s resting order was hit: {trade}")
+    #                 # Update portfolio and cash for these fills as well
+    #                 cost = trade.price * trade.size * LOT_SIZE
+    #                 # Note: For a passive fill, the side is opposite the order
+    #                 # e.g., a resting BUY order is filled by a Taker's SELL
+    #                 if trade.taker_side == Side.SELL: # Our resting BUY was hit
+    #                     self.portfolio[trade.ticker_id] += trade.size
+    #                     self.cash_balance -= cost
+    #                 elif trade.taker_side == Side.BUY: # Our resting SELL was hit
+    #                     self.portfolio[trade.ticker_id] -= trade.size
+    #                     self.cash_balance += cost    
+
     def _check_trade_confirmations(self):
-        """
-        Checks the notification mailbox for any PASSIVE orders that were filled
-        by other market participants.
-        """
+        """ Checks all active order books for trade notifications for this agent. """
         for ticker_tuple in self.exchange.tickers:
             book = self.exchange.get_book(ticker_tuple[0])
             if book:
-                # This logic remains the same, handling passive fills
                 notifications = book.collect_notifications_for(self.agent.agent_id)
                 for trade in notifications:
-                    print(f"    [PASSIVE FILL] Agent {self.agent.agent_id}'s resting order was hit: {trade}")
-                    # Update portfolio and cash for these fills as well
+                    print(f"    CONFIRMED: Agent {self.agent.agent_id} trade executed: {trade}")
                     cost = trade.price * trade.size * LOT_SIZE
-                    # Note: For a passive fill, the side is opposite the order
-                    # e.g., a resting BUY order is filled by a Taker's SELL
-                    if trade.taker_side == Side.SELL: # Our resting BUY was hit
+                    
+                    # SIMPLE FIX: If we're getting notified, we were the MAKER
+                    # (Only makers get passive fill notifications)
+                    if trade.maker_side == Side.BUY:  # Our BUY order was hit
                         self.portfolio[trade.ticker_id] += trade.size
                         self.cash_balance -= cost
-                    elif trade.taker_side == Side.BUY: # Our resting SELL was hit
+                    elif trade.maker_side == Side.SELL:  # Our SELL order was hit  
                         self.portfolio[trade.ticker_id] -= trade.size
-                        self.cash_balance += cost    
+                        self.cash_balance += cost
+                    
+                    if self.portfolio.get(trade.ticker_id) == 0:
+                        del self.portfolio[trade.ticker_id]
     def _calculate_portfolio_value(self) -> float:
         value = self.cash_balance
         for ticker, quantity in self.portfolio.items():
@@ -210,7 +294,7 @@ class HybridAgentEnvironment:
     def _calculate_shaped_reward(self, old_value: float, rnn_signal: int, executed_action: dict) -> float:
         pnl_reward = self._calculate_portfolio_value() - old_value
         
-        consistency_reward = 0.0
+        consistency_reward = 0.2
         if executed_action and rnn_signal is not None:
             action_is_bullish = (executed_action['side'] == Side.BUY and 'CE' in executed_action['ticker']) or \
                                 (executed_action['side'] == Side.SELL and 'PE' in executed_action['ticker'])
@@ -231,22 +315,6 @@ class HybridAgentEnvironment:
         all_opts = [t[0] for t in self.exchange.tickers if t[0] != 'STOCK_UNDERLYING']
         all_opts.sort(key=lambda ticker: abs(int(ticker.split('_')[1]) - price))
         self.active_tickers = all_opts[:self.n_tickers_to_observe]
-        
-    # def _check_trade_confirmations(self):
-    #     for ticker in self.active_tickers:
-    #         book = self.exchange.get_book(ticker)
-    #         if book:
-    #             notifications = book.collect_notifications_for(self.agent.agent_id)
-    #             for trade in notifications:
-    #                 cost = trade.price * trade.size * LOT_SIZE
-    #                 if trade.taker_side == Side.BUY:
-    #                     self.portfolio[trade.ticker_id] += trade.size
-    #                     self.cash_balance -= cost
-    #                 elif trade.taker_side == Side.SELL:
-    #                     self.portfolio[trade.ticker_id] -= trade.size
-    #                     self.cash_balance += cost
-    #                 if self.portfolio.get(trade.ticker_id) == 0:
-    #                     del self.portfolio[trade.ticker_id]
 
     def _is_episode_done(self):
         # Placeholder for episode termination logic (e.g., end of trading day)

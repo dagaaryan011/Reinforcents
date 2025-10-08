@@ -6,7 +6,7 @@ from .orderbook import OrderBook
 from .trade_records import TradeLedger
 
 class MarketExchange:
-    def __init__(self, underlying_price=1300.0, strike_interval=5, option_depth=20, time_to_expiry=(30/365.0)):
+    def __init__(self, underlying_price=1300.0, strike_interval=5, option_depth=6, time_to_expiry=(30/365.0)):
         self.underlying_price = underlying_price
         self.strike_interval = strike_interval
         self.option_depth = option_depth

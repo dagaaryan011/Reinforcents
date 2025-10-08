@@ -54,14 +54,14 @@ class MarketMaker:
                 optim_path = os.path.join(model_dir, f'{name}_optim_{self.agent_id}.pt')
                 torch.save(optimizer.state_dict(), optim_path)
 
-        print("\nSaving models...")
+        # print("\nSaving models...")
         save_network(self.selector, self.selector.optimizer, 'selector')
         save_network(self.actor, self.actor.optimizer, 'actor')
         save_network(self.critic_1, self.critic_1.optimizer, 'critic_1')
         save_network(self.critic_2, self.critic_2.optimizer, 'critic_2')
         save_network(self.value, self.value.optimizer, 'value')
         save_network(self.target_value, None, 'target_value') # No optimizer
-        print("Save complete.")
+        # print("Save complete.")
 
 
     def load_models(self):
@@ -106,17 +106,14 @@ class MarketMaker:
         self.selectstates[i] =allstates
         selection = self.select(allstates)
         probabilities = F.softmax(selection, dim=1).squeeze(0).detach().numpy()
-        print(selection)
+        #print(selection)
+        self.expiry_volumes_highest_index = self.assign_volumes()
+        
+        idx = np.random.choice(24, p=probabilities)
 
-        random = np.random.rand()    # greedy
-        if random < self.epsilon:
-            idx = np.random.randint(0,24)
-        else :
-            idx = np.random.choice(24, p=probabilities)
-
-        print(idx)
+        #print(idx)
         ticker = self.broker.env.tickers_list[idx]   # get the chosen ticker
-
+        print(f"{self.agent_id} putting order in {ticker} i.e. {idx}")
         state = self.broker.get_actual_state(ticker)
         action, log_probs = self.get_action(state)
         bid_price, bid_size, ask_price, ask_size = self.decide_values(action, state[1], state[2])  # decide the price and sizes
@@ -129,7 +126,7 @@ class MarketMaker:
         self.actions[i] = action
         self.rewards[i] = reward
         # print(state)
-        print(reward)
+        #print(reward)
 
         if i-10>=0:
             self.new_states[i-10] = state
@@ -199,6 +196,8 @@ class MarketMaker:
     def assign_volumes(self):
         expiry_volumes = []
         for ticker in self.broker.env.tickers_list:
+            
+            #print(self.broker.env.total_volumes[ticker])
             expiry_volumes.append(self.broker.env.total_volumes[ticker])
         
         expiry_volumes = np.array(expiry_volumes)
@@ -253,9 +252,6 @@ class MarketMaker:
             actions = torch.tensor(actions, dtype=torch.float)
             actions = torch.squeeze(actions, 1)
             rewards = torch.tensor(rewards, dtype=torch.float)
-            expiry_volumes = torch.tensor(self.expiry_volumes, dtype=torch.float)
-            expiry_volumes = expiry_volumes.unsqueeze(0) 
-            expiry_volumes = expiry_volumes.expand(self.batch_size, -1)
 
             target_index = self.expiry_volumes_highest_index
             target_labels = torch.full((self.batch_size,), target_index, dtype=torch.long)
@@ -330,14 +326,19 @@ class MarketMaker:
         self.expiry_volumes = []
 
     def action_at_expiry(self, initial, final):
-        self.assign_settlements(final)
+        #self.assign_settlements(final)
+        self.broker.settlement(final)
         self.expiry_volumes_highest_index = self.assign_volumes()
         self.broker.settle()
         PL = self.broker.get_PL(initial, final)
-        # print(f"{self.agent_id} : {PL}")
+        print("final ", final)
+        print(f"{self.agent_id} PL: {PL}")
+        print(f"{self.agent_id} capital: {self.broker.capital}")
+        print(f"{self.agent_id} inventory: {self.broker.inventory}")
         self.learn()
         self.broker.new_day()     # resets for new option trading 
         self.broker.reset_portfolio()   # empties the portfolio for tickers of next options trading
+
 
 def initialize_MM_agent(agent_id):
     Agent = MarketMaker(agent_id)

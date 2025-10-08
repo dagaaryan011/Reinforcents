@@ -15,6 +15,14 @@ AGENT_FPERSONALITIES = [
     ['macd', 'stoch', 'status'],            # Hybrid Trader
     ['macd', 'rsi', 'stoch', 'adx', 'status'] # All-Rounder
 ]
+MODEL_BASE_PATH = r"D:\NetworkPrediction\data\models\retail"
+PERSONALITY_MODEL_NAMES = {
+    'Momentum Trader': ['macd', 'rsi', 'stoch'],
+    'Trend Follower':  ['rsi', 'adx', 'status'],
+    'Hybrid Trader':   ['macd', 'stoch', 'status'],
+    'All-Rounder':     ['macd', 'rsi', 'stoch', 'adx', 'status']
+}
+
 # The total number of features in the input vector.
 NUM_FEATURES = len(FEATURE_LIST)
 
