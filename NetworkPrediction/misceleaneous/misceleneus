@@ -1,0 +1,537 @@
+functions.py prev version
+
+
+# import numpy as np
+# import pandas as pd
+# from datetime import date, timedelta
+# from noise import generate_daily_price_path
+# import matplotlib.pyplot as plt
+
+
+# curr_date = date(2023, 2, 1)
+# price_path = generate_daily_price_path(curr_date)
+
+
+# class IndicatorPlotter:
+#     """
+#     A class to store indicator data from a simulation and plot the results.
+#     """
+#     def __init__(self, price_path):
+#         """
+#         Initializes the plotter with the full price path.
+#         """
+#         self.price_path = price_path
+#         self.time_steps = list(range(len(self.price_path)))
+        
+#         # Lists to store indicator data points as (time_step, value) tuples
+#         self.sma_points = []
+#         self.ema_points = []
+#         self.macd_points = []
+#         self.signal_points = []
+
+#     def record_indicators(self, time_step, sma, ema, macd, signal):
+#         """
+#         Records the calculated indicator values at a specific time step.
+#         This method should be called inside your simulation loop.
+#         """
+#         if sma is not None:
+#             self.sma_points.append((time_step, sma))
+#         if ema is not None:
+#             self.ema_points.append((time_step, ema))
+#         if macd is not None:
+#             self.macd_points.append((time_step, macd))
+#         if signal is not None:
+#             # We also record the corresponding time step for the signal line
+#             self.signal_points.append((time_step, signal))
+
+#     def plot(self):
+#         """
+#         Generates and displays the plots for the recorded data.
+#         """
+#         # --- Create the figure and subplots ---
+#         # We create 2 plots, one on top of the other
+#         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 10), sharex=True)
+        
+#         # --- Plot 1: Price, SMA, and EMA ---
+#         ax1.plot(self.time_steps, self.price_path, label='Price Path', color='blue', alpha=0.7)
+        
+#         # Unzip the recorded points into x (time) and y (value) for plotting
+#         if self.sma_points:
+#             sma_x, sma_y = zip(*self.sma_points)
+#             ax1.plot(sma_x, sma_y, label='SMA', color='orange', linestyle='--')
+        
+#         if self.ema_points:
+#             ema_x, ema_y = zip(*self.ema_points)
+#             ax1.plot(ema_x, ema_y, label='EMA', color='green', linestyle='--')
+            
+#         ax1.set_title('Price Path with Moving Averages')
+#         ax1.set_ylabel('Price')
+#         ax1.legend()
+#         ax1.grid(True)
+        
+#         # --- Plot 2: MACD and Signal Line ---
+#         if self.macd_points:
+#             macd_x, macd_y = zip(*self.macd_points)
+#             ax2.plot(macd_x, macd_y, label='MACD Line', color='purple')
+        
+#         if self.signal_points:
+#             signal_x, signal_y = zip(*self.signal_points)
+#             ax2.plot(signal_x, signal_y, label='Signal Line', color='red', linestyle=':')
+        
+#         # Add a zero line for reference
+#         ax2.axhline(0, color='grey', linestyle='--', alpha=0.5)
+        
+#         ax2.set_title('MACD Indicator')
+#         ax2.set_xlabel('Time Steps')
+#         ax2.set_ylabel('Value')
+#         ax2.legend()
+#         ax2.grid(True)
+        
+#         # --- Display the plot ---
+#         plt.tight_layout() # Adjusts plot params for a tight layout.
+#         plt.show()
+
+# def SMA_n(trend, n):
+#     if len(trend) < n:
+#        return None, None
+#     prices_for_period = trend[-n:]
+#     price_array = np.array(prices_for_period)
+#     sma = np.mean(price_array)
+#     sd = np.std(price_array, ddof=1) # ddof=1 for sample standard deviation
+
+#     return sma, sd
+
+
+# def EMA_n(trend,  n,smoothing  = 2 ):
+
+#     if len(trend)<n:
+#         sma , sd = SMA_n(trend=trend, n=n)
+#         return sma
+
+    
+#     else:
+#         view_window = trend[-n:]
+#         price_series = pd.Series(view_window)
+#         ema_series = price_series.ewm(span=n, adjust=False).mean()
+#         ema = np.array(ema_series)
+#         return ema[-1]
+
+
+
+# def MACD(trend):
+
+
+#     EMA_26 = EMA_n(trend,26)
+#     EMA_12 = EMA_n(trend,12)
+
+#     if EMA_12 is not None and EMA_26 is not None:
+#         macd_val = EMA_12 - EMA_26
+#         return macd_val
+#     else:
+#         return None
+
+# import numpy as np
+
+# def RSI(trend, n=14):
+    
+#     if len(trend) < n + 1:
+#         return None
+
+    
+#     window = trend[-(n + 1):]
+    
+#     positive_changes = []
+#     negative_changes = []
+
+#     for i in range(n):
+#         rate = window[i+1] - window[i]
+#         if rate > 0:
+#             positive_changes.append(rate)
+#         else:
+            
+#             negative_changes.append(abs(rate))
+
+    
+#     gains = positive_changes if positive_changes else [0]
+#     losses = negative_changes if negative_changes else [0]
+    
+#     avg_gain = np.sum(gains) / n
+#     avg_loss = np.sum(losses) / n
+
+    
+#     if avg_loss == 0:
+#         return 100.0
+
+    
+#     rs = avg_gain / avg_loss
+    
+    
+#     rsi = 100 - (100 / (1 + rs))
+    
+#     return rsi
+
+# trend = []
+# macd_history = []
+# timeperiod = 30
+# last_indice = len(price_path-1)
+# plotter = IndicatorPlotter(price_path)
+
+# # --- MAIN SIMULATION SCRIPT ---
+# if __name__ == '__main__':
+#     # --- SETUP ---
+#     days_to_simulate = 30
+#     start_date = date(2023, 1, 1) 
+    
+    
+#     full_price_path = []
+#     trend = []
+#     macd_history = []
+    
+    
+#     global_time_step = 0
+    
+    
+#     plotter = IndicatorPlotter(price_path=[]) 
+    
+#     # --- SIMULATION LOOP ---
+#     print("Running multi-day simulation...")
+#     for j in range(days_to_simulate):
+        
+#         price_path = generate_daily_price_path(curr_date)
+
+#         while price_path is None or price_path.size == 0:
+
+#             print(f"Skipping non-trading day: {curr_date}")
+
+#             curr_date += timedelta(days=1)
+
+#             price_path = generate_daily_price_path(curr_date)
+
+        
+#         full_price_path.extend(price_path)
+        
+#         # This inner loop now iterates through the new day's prices
+#         for price in price_path:
+#             trend.append(price)
+            
+            
+#             if global_time_step > 0 and global_time_step % 30 == 0:
+#                 sma, sd = SMA_n(trend=trend, n=30)
+#                 ema = EMA_n(trend=trend, n=30)
+                
+#                 current_macd = MACD(trend)
+#                 if current_macd is not None:
+#                     macd_history.append(current_macd)
+                
+#                 signal_line = EMA_n(macd_history, n=9)
+                
+#                 # --- Record Data ---
+#                 # We use the continuous global_time_step for plotting
+#                 plotter.record_indicators(
+#                     time_step=global_time_step,
+#                     sma=sma,
+#                     ema=ema,
+#                     macd=current_macd,
+#                     signal=signal_line
+#                 )
+            
+            
+#             global_time_step += 1
+        
+        
+#         curr_date += timedelta(days=1)
+#         print(f"Simulated Day {j+1}...")
+
+#     # --- PLOTTING (AFTER THE LOOP) ---
+#     print("Simulation complete. Generating plot...")
+    
+#     # 1. Update the plotter with the complete multi-day price path
+#     plotter.price_path = full_price_path
+#     plotter.time_steps = list(range(len(full_price_path)))
+    
+#     # 2. Call plot() only ONCE, after all data is collected
+#     plotter.plot()
+
+
+
+
+import numpy as np
+import pandas as pd
+from datetime import date, timedelta
+# from noise import generate_daily_price_path
+import matplotlib.pyplot as plt
+
+class Indicators:
+    def __init__(self,trend):
+        self.trend = trend
+    def SMA_n(self, n:int):
+        if len(self.trend) < n:
+            return None, None
+        prices_for_period = self.trend[-n:]
+        price_array = np.array(prices_for_period)
+        sma = np.mean(price_array)
+        sd = np.std(price_array, ddof=1)
+        return sma, sd
+
+    def EMA_n(self, n:int):
+        if len(self.trend) < n:
+            return None
+        price_series = pd.Series(self.trend)
+        ema_series = price_series.ewm(span=n, adjust=False).mean()
+        return ema_series.iloc[-1]
+
+    def MACD(self):
+        EMA_26 = self.EMA_n(self.trend,26)
+        EMA_12 = self.EMA_n(self.trend,12)
+
+        if EMA_12 is not None and EMA_26 is not None:
+            macd_val = EMA_12 - EMA_26
+            return macd_val
+        else:
+            return None
+    def RSI(self):#14 is std RSI period , change in price of stock pe RSI banate hai
+        if len(self.trend) < 14 + 1:
+            return None
+        window = self.trend[-(14 + 1):]
+        positive_changes = []
+        negative_changes = []
+        for i in range(14):
+            rate = window[i+1] - window[i]
+            if rate > 0:
+                positive_changes.append(rate)
+            else:
+                negative_changes.append(abs(rate))
+        gains = positive_changes if positive_changes else [0]
+        losses = negative_changes if negative_changes else [0]
+        avg_gain = np.sum(gains) / 14
+        avg_loss = np.sum(losses) / 14
+        if avg_loss == 0:
+            return 100.0
+        rs = avg_gain / avg_loss
+        rsi = 100 - (100 / (1 + rs))
+        return rsi
+
+    def Smooth_RSI(self):#14 is std value for RSI
+        if len(self.trend) < 14 + 1:
+            return None
+        price_series = pd.Series(self.trend)
+        delta = price_series.diff()
+        gain = delta.where(delta > 0, 0)
+        loss = -delta.where(delta < 0, 0)
+        avg_gain = gain.ewm(com=14 - 1, adjust=False).mean()
+        avg_loss = loss.ewm(com=14 - 1, adjust=False).mean()
+        last_avg_loss = avg_loss.iloc[-1]
+        if last_avg_loss == 0:
+            return 100.0
+        rs = avg_gain.iloc[-1] / last_avg_loss
+        rsi = 100 - (100 / (1 + rs))
+        return rsi
+
+
+    def Stoch_Oscilator(self):
+        if len(self.trend)<14:
+            return None
+        
+        window = np.array(self.trend[-14:])
+        low = np.min(window)
+        high = np.max(window)
+        if high == low :
+            return 50
+
+        else:
+            closing_price = self.trend[-1]
+            per_k = 100*(closing_price-low)/(high-low)
+        return per_k
+    def Volume_predictor():
+        volume_pred = 0
+        
+        return volume_pred
+    def trend():
+        pass
+
+
+
+
+
+    pipeline version 1 Run
+    import tensorflow as tf
+import numpy as np
+from functions import Indicators
+import os
+class Pipeline:
+
+    def __init__(self):
+        model_path = "models/model_rnn_1.keras"
+        self.all_indicators = Indicators([])
+        self.main_network = tf.keras.models.load_model(model_path)
+        self.indecator_input = [0, 0, 0]
+        self.feature_history = []
+        self.sequence_lenght = 30
+        self.trend = []
+        
+
+    def preprocessed_inputs(self):
+        # indicator_hist = [macd hist:list[float] , k hist:list[float]]
+        #macd--------------------------------- 
+        indicator_list = [4]
+        indicator_list[0]= self.macd_signal()
+        indicator_list[1]= self.get_rsi_signal()
+        indicator_list[2]= self.get_stochastic_signal()
+        indicator_list[3]=self.get_current_status()
+
+        #1- macd , rsi , stoch , current status       
+        return indicator_list
+    
+    def inference(self):
+        predictions = self.main_network.predict(self.indecator_input)
+
+    def processed_output(self):
+        out = [0, 0, 1]
+        return out.index(1) - 1
+
+    def train(self, matrix):
+        train_x = np.array([row[0] for row in matrix])
+        train_y = np.array([row[1] + 1 for row in matrix])
+        history = self.main_network.fit(
+            train_x,
+            train_y,
+            epochs=10,
+            validation_split=0.2
+        )
+        self.main_network.save("models/model_rnn_1.keras")
+
+    def predict(self, latest_features):
+        self.feature_history.append(latest_features) 
+        if len(self.feature_history) > self.sequence_length:
+            self.feature_history.pop(0)
+        if len(self.feature_history) < self.sequence_length:
+            return 0
+        input_sequence = np.array(self.feature_history).reshape(1, self.sequence_length, -1)
+ 
+        output = self.main_network.predict(input_sequence)
+        prediction = np.argmax(output)
+        print(prediction-1)
+        
+        
+        return output - 1
+
+
+    def macd_signal(self,n ):
+        window_size: int = n
+        if len(self.macd_history) < (2 * window_size) + 9:
+            return 0
+
+        end_window = self.macd_history[-window_size:]
+        start_window = self.macd_history[-(2 * window_size):-window_size]
+
+        macd_end = end_window[-1]
+        macd_start = start_window[-1]
+
+        signal_end = self.all_indicators.EMA_n(end_window, n=9)
+        signal_start = self.all_indicators.EMA_n(start_window, n=9)
+
+        if signal_end is None or signal_start is None:
+            return 0
+
+        if (macd_start - signal_start) <= 0 and (macd_end - signal_end) > 0:
+            return 1
+
+        elif (macd_start - signal_start) >= 0 and (macd_end - signal_end) < 0:
+            return -1
+
+        else:
+            return 0
+    def RSI_conviction(self):
+        pass
+    def get_rsi_signal(self,n):
+        
+        window_size: int = n
+        rsi_period: int = 14
+        if len(self.trend) < window_size + rsi_period + 1:
+            return 0
+
+        overbought_count = 0
+        oversold_count = 0
+
+        for i in range(window_size):
+            current_trend_slice = self.trend[:-(window_size - i - 1)]
+
+            rsi_value = self.all_indicators.Smooth_RSI(current_trend_slice, n=rsi_period)
+
+            if rsi_value is not None:
+                if rsi_value > 70:
+                    overbought_count += 1
+                elif rsi_value < 30:
+                    oversold_count += 1
+
+        if overbought_count > oversold_count:
+            return 1
+        elif oversold_count > overbought_count:
+            return -1
+        else:
+            return 0    
+    def get_stochastic_signal(self ):
+        # Args:
+        #     trend (list): The full history of price data.
+        #     window_size (int): The number of time steps to check for signals.
+        #     k_period (int): The lookback period for the %K calculation.
+
+
+        # Returns:
+        #     int: 1 if overbought signals were dominant, -1 if oversold signals
+        #          were dominant, and 0 otherwise.
+
+        window_size: int = 30
+        k_period: int = 14
+        if len(self.trend) < window_size + k_period:
+            return 0
+
+        overbought_count = 0
+        oversold_count = 0
+
+        for i in range(window_size):
+            current_trend_slice = self.trend[:-(window_size - i - 1)]
+
+            k_value = self.Stoch_Oscilator(current_trend_slice, n=k_period)
+
+            if k_value is not None:
+                if k_value > 80:
+                    overbought_count += 1
+                elif k_value < 20:
+                    oversold_count += 1
+
+        if overbought_count > oversold_count:
+            return 1
+        elif oversold_count > overbought_count:
+            return -1
+        else:
+            return 0
+    def get_current_status(trend: list[float]):
+        
+        total_steps = len(trend)
+        steps_in_day = 375
+
+        
+        num_full_days = total_steps // steps_in_day
+
+        
+        start_of_current_day = num_full_days * steps_in_day
+
+        
+        current_day_trend = trend[start_of_current_day:]
+
+        
+        if not current_day_trend:
+            return None
+
+        highest_price = np.max(current_day_trend)
+        lowest_price = np.min(current_day_trend)
+
+        
+        midpoint = (highest_price + lowest_price) / 2
+
+        ratio = (current_day_trend[-1] - midpoint)/abs(highest_price-midpoint)
+        return ratio
+
+    def update_trend(self, x):
+        pass
