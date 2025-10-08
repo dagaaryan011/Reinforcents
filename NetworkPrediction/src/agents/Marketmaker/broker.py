@@ -1,5 +1,8 @@
 from ...market.orderbook import Order, Side
 from config import LOT_SIZE
+from collections import defaultdict
+import numpy as np
+#TODO change the limit of the amount an option can be bought
 class Broker:
     def __init__(self):
         
@@ -11,7 +14,7 @@ class Broker:
         self.temp_inventory = 100
         self.inventory = 100
         self.portfolio_value = 0
-        self.portfolio = {}
+        self.portfolio = defaultdict(int)
         self.cash_settlement = {}
 
         self.env = None    # one common connected to the market
@@ -43,11 +46,14 @@ class Broker:
         self.portfolio_value = value
         return value
     def get_actual_state(self,ticker):
-        state = self.env.get_state(ticker)
-        state.append(self.capital)
-        state.append(self.inventory)
-        state.append(self.portfolio[ticker])
-
+        if self.portfolio[ticker]<=10 and self.portfolio[ticker]>= -10:
+            state = self.env.get_state(ticker)
+            state.append(self.capital)
+            state.append(self.inventory)
+            state.append(self.portfolio[ticker])
+        else:
+            zero = np.zeros(14).tolist()
+            state = zero
         return state
     
     def get_all_states(self):
@@ -58,6 +64,7 @@ class Broker:
         return states
     
     def get_notifications(self, agent_id):
+        #TODO change the function for proper execution
         for ticker in self.env.tickers_list: 
             ob = self.env.exchange.get_book(ticker)
             notifs = ob.collect_notifications_for(agent_id)
@@ -65,61 +72,83 @@ class Broker:
                 if notif.maker_side == Side.BUY:
                     self.portfolio[notif.ticker_id] += notif.size
                     self.inventory += notif.size
-                    self.temp_inventory += notif.size
+                    
                     self.capital -= notif.price * notif.size
-                    self.temp_capital -= notif.price * notif.size
+                    
                     #print(notif.size)
                 if notif.maker_side == Side.SELL:
                     self.portfolio[notif.ticker_id] -= notif.size
                     self.inventory -= notif.size
-                    self.temp_inventory -= notif.size
+                    
                     self.capital += notif.price * notif.size
-                    self.temp_capital += notif.price * notif.size
+                    
                     #print(notif.size)
     
-    def update_book(self, ticker, b_p, a_p, b_s, a_s, agent_id):     # palces the actual orders which get executed or not
-        buy_order = Order(Side.BUY, b_p, b_s, owner_id=agent_id)
-        sell_order = Order(Side.SELL, a_p, a_s, owner_id=agent_id)
-        ob = self.env.exchange.get_book(ticker)
-        executed_trades_buy = ob.add_order(buy_order)
-        executed_trades_sell = ob.add_order(sell_order)
+    # def update_book(self, ticker, b_p, a_p, b_s, a_s, agent_id):     # TODO change logic here , will put the order , if execute , change potfolio
+    #     buy_order = Order(Side.BUY, b_p, b_s, owner_id=agent_id)
+    #     sell_order = Order(Side.SELL, a_p, a_s, owner_id=agent_id)
+    #     ob = self.env.exchange.get_book(ticker)
+    #     executed_trades_buy = ob.add_order(buy_order)
+    #     executed_trades_sell = ob.add_order(sell_order)
 
-        done_buy_price = sum(t.price*t.size for t in executed_trades_buy)
-        done_buy_size = sum(t.size for t in executed_trades_buy)
-        done_sell_price = sum(t.price*t.size for t in executed_trades_sell)
-        done_sell_size = sum(t.size for t in executed_trades_sell)
+    #     done_buy_price = sum(t.price*t.size for t in executed_trades_buy)
+    #     done_buy_size = sum(t.size for t in executed_trades_buy)
+    #     done_sell_price = sum(t.price*t.size for t in executed_trades_sell)
+    #     done_sell_size = sum(t.size for t in executed_trades_sell)
 
-        remaining_buy_size = b_s - done_buy_size
-        remaining_sell_size = a_s - done_sell_size
+    #     remaining_buy_size = b_s - done_buy_size
+    #     remaining_sell_size = a_s - done_sell_size
 
-        self.capital += done_sell_price - done_buy_price 
-        self.temp_capital += done_sell_price - done_buy_price
+    #     self.capital += done_sell_price - done_buy_price 
+    #     self.temp_capital += done_sell_price - done_buy_price
 
-        self.inventory += done_buy_size - done_sell_size
-        self.temp_inventory += done_buy_size - done_sell_size
+    #     self.inventory += done_buy_size - done_sell_size
+    #     self.temp_inventory += done_buy_size - done_sell_size
         
-        self.temp_capital -= b_p * remaining_buy_size
-        self.temp_inventory -= remaining_sell_size
-        self.portfolio[ticker] += done_buy_size - done_sell_size
+    #     self.temp_capital -= b_p * remaining_buy_size
+    #     self.temp_inventory -= remaining_sell_size
+    #     self.portfolio[ticker] += done_buy_size - done_sell_size
 
-        # print(b_p, a_p, b_s, a_s)
-        # print(self.capital)
-        # print(self.temp_capital)
-        # print(self.inventory)
-        # print(self.temp_inventory)
-        # print(self.portfolio[ticker])
+    #     # print(b_p, a_p, b_s, a_s)
+    #     # print(self.capital)
+    #     # print(self.temp_capital)
+    #     # print(self.inventory)
+    #     # print(self.temp_inventory)
+    #     # print(self.portfolio[ticker])
 
-        # return done_buy_price, done_sell_price, done_buy_size, done_sell_size
+    #     # return done_buy_price, done_sell_price, done_buy_size, done_sell_size
+    def update_book(self, ticker, b_p, a_p, b_s, a_s, agent_id):
+        """Place buy/sell orders and handle executions"""
+        # Place buy order
+        buy_order = Order(Side.BUY, b_p, b_s, agent_id)
+        buy_trades = self.env.exchange.get_book(ticker).add_order(buy_order)
+
+        # Place sell order  
+        sell_order = Order(Side.SELL, a_p, a_s, agent_id)
+        sell_trades = self.env.exchange.get_book(ticker).add_order(sell_order)
+
+        # Process buy executions
+        for trade in buy_trades:
+            self.portfolio[ticker] += trade.size
+            self.capital -= trade.price * trade.size * LOT_SIZE
+
+        # Process sell executions  
+        for trade in sell_trades:
+            self.portfolio[ticker] -= trade.size
+            self.capital += trade.price * trade.size * LOT_SIZE
+
+        print(f'buy_filled: {len(buy_trades)}')
+        print(f'sell_filled: {len(sell_trades)}')
+        # Return simple summary
+        # return {
+        #     'buy_filled': len(buy_trades),
+        #     'sell_filled': len(sell_trades)
+        # }
         
             
     def reset_portfolio(self):
-        self.portfolio = {}
+        self.portfolio.clear()
         
-    def set_portfolio(self):
-        for ticker in self.env.tickers_list:
-            self.portfolio[ticker] = 0
-        # print("portfolio set")
-
     def settlement(self, final_price: float):
         """Correct settlement logic for options"""
         for ticker, amount in self.portfolio.items():
@@ -169,8 +198,9 @@ class Broker:
 
     def get_PL(self, initial, final):
         PL = ( self.capital  ) - ( self.start_cash )
-        return PL
         self.start_cash = self.capital
+        return PL
+        
 
     def new_day(self):
         self.temp_capital = self.capital

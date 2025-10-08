@@ -38,7 +38,7 @@ class MarketMaker:
         self.expiry_volumes = []
         self.expiry_volumes_highest_index = 0
 
-        self.t = 0
+        self.t = 0#timestamp for learning
 
     def save_models(self):
 
@@ -163,6 +163,7 @@ class MarketMaker:
         return action.detach().numpy(), logprob.detach().numpy()
     
     def decide_values(self, action, highest_bid, lowest_ask):
+        
         action_values = action[0]
         # print(action_values)
         size = min(self.broker.temp_inventory, 10)
@@ -176,6 +177,7 @@ class MarketMaker:
         
     
     def get_reward(self, ticker, bid_price, bid_size, ask_price, ask_size, highest_bid, lowest_ask):
+        #good  , no changes here
         PL = ask_price * ask_size - bid_price * bid_size
         diff_bid = abs(bid_price - highest_bid)
         diff_ask = abs(lowest_ask - ask_price)
@@ -185,13 +187,13 @@ class MarketMaker:
         self.broker.temp_inventory += size_diff
         return reward
     
-    def assign_settlements(self, final):
-        self.broker.settlement(final)
-        self.expiry_rewards = []
-        for ticker in self.broker.env.tickers_list:
-            # print(self.broker.portfolio[ticker])
-            # print(self.broker.cash_settlement[ticker])
-            self.expiry_rewards.append(self.broker.cash_settlement[ticker])    # at the end get the sttlement calculated for each ticker (comparing selector values with this)
+    # def assign_settlements(self, final):
+    #     self.broker.settlement(final)
+    #     self.expiry_rewards = []
+    #     for ticker in self.broker.env.tickers_list:
+    #         # print(self.broker.portfolio[ticker])
+    #         # print(self.broker.cash_settlement[ticker])
+    #         self.expiry_rewards.append(self.broker.cash_settlement[ticker])    # at the end get the sttlement calculated for each ticker (comparing selector values with this)
     
     def assign_volumes(self):
         expiry_volumes = []

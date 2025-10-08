@@ -41,7 +41,7 @@ class MarketExchange:
                     book.market_price = new_book_market_price
                 
                 # First, add new orders based on the new price
-                book._maintain_book_depth()
+                # book._maintain_book_depth()
                 # Then, clean up any very old orders that are now stale
                 book._prune_stale_orders()
 

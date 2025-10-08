@@ -145,9 +145,10 @@ for i in range(n_episodes):
         for agent in insti_agents: agent.preprocess_input(price)
         for env in retail_envs: env.update_state(price)
         
-        # mm_env.run(days_to_expiry / 365.0, price)
-        # for agent in mm_agents:
-        #     run_mm_step(agent, mm_env)
+        mm_env.run(days_to_expiry / 365.0, price)
+        
+        for agent in mm_agents:
+            run_mm_step(agent, mm_env)
             
         if (step + 1) % decision_frequency == 0:
             # 1. INSTITUTIONAL AGENTS ACT
@@ -164,7 +165,7 @@ for i in range(n_episodes):
     # --- E. END-OF-DAY LEARNING & REPORTING ---
     print(f"\n--- Day {i+1} Finished | Closing Price: {daily_price_path[-1]:.2f} ---")
     
-    # mm_env.indicator()
+    mm_env.indicator()
     
     # Institutional agents learn from the day's experiences
     for agent in insti_agents:
@@ -186,7 +187,7 @@ for i in range(n_episodes):
     print("  --- Market Maker Portfolios ---")
     # (Assuming MM agent has `portfolio_value` and `cash_balance` attributes)
     
-    # print("  --- Market Maker Portfolios ---"); [print(f"    {agent.agent_id}: Value: {agent.broker.portfolio_value:,.2f}, Cash: {agent.broker.capital:,.2f}, Pos: {dict(agent.broker.portfolio)}") for agent in mm_agents]
+    print("  --- Market Maker Portfolios ---"); [print(f"    {agent.agent_id}: Value: {agent.broker.portfolio_value:,.2f}, Cash: {agent.broker.capital:,.2f}, Pos: {dict(agent.broker.portfolio)}") for agent in mm_agents]
         
     print("  --- Retail Agent Portfolios ---")
     for env in retail_envs:
@@ -202,11 +203,11 @@ for i in range(n_episodes):
         final_price = daily_price_path[-1]
         opening_price = daily_price_path[0]
         print(f"    Settlement: Final Stock Price = {final_price}")
-        # for env in insti_envs: env.settle_at_expiry(final_price)
+        for env in insti_envs: env.settle_at_expiry(final_price)
         for env in retail_envs: env.settle_at_expiry(final_price)
-        # for agent in mm_agents: agent.action_at_expiry(opening_price, final_price)
+        for agent in mm_agents: agent.action_at_expiry(opening_price, final_price)
 
-        # mm_env.action_at_expiry()
+        mm_env.action_at_expiry()
         
         days_to_expiry = option_cycle_days
         
@@ -214,5 +215,5 @@ print("\n--- Simulation Complete ---")
 
 # Final model save
 print("--- Saving Final Models ---")
-# for agent in insti_agents:
-#     agent.save_models(n_episodes)
+for agent in insti_agents:
+    agent.save_models(n_episodes)
