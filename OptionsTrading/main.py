@@ -7,6 +7,8 @@ import time
 from Market.exchange import MarketExchange
 from Agents.MarketMaker.environment import Env, run
 from Agents.MarketMaker.agent import initialize_MM_agent
+from Agents.RetailTrader.environment import Envn, runn
+from Agents.RetailTrader.agent import initialize_RT_agent
 from Market.noise import generate_daily_price_path
 
 # A class to handle real-time plotting of agent performance and market price.
@@ -71,15 +73,24 @@ if __name__ == '__main__':
     # --- Simulation Parameters ---
     start_date = date(2023, 2, 1)
     n_episodes = 300  # Each episode represents one trading day.
-    option_time = 5  # the total time of options trading
+    option_time = 10  # the total time of options trading
     # --- Agent Initialization ---
 
     MM_env = Env()
+    RT_env = Envn()
+
     mm_traders = []
     for i in range(1,2):
         mm_traders.append(initialize_MM_agent(agent_id=f"MM_{i}"))
     for agent in mm_traders:
         agent.load_models()
+
+    rt_traders = []
+    for i in range(1,2):
+        rt_traders.append(initialize_RT_agent(agent_id=f"RT_{i}"))
+    for agent in rt_traders:
+        agent.load_models()
+
 
         
     # print(type(ddpg_traders[0][0]), type(ddpg_traders[0][1]))
@@ -122,8 +133,11 @@ if __name__ == '__main__':
         print(tickers)
 
         MM_env.exchange = central_market
+        RT_env.exchange = central_market
         for agent in mm_traders:
             agent.broker.env = MM_env
+        for agent in rt_traders:
+            agent.broker.env = RT_env
         
 
         print(f"\n--- Starting Episode {i+1} for Date: {current_date} ---")
@@ -139,6 +153,9 @@ if __name__ == '__main__':
             MM_env.run(days_to_expiry/365, daily_price_path[step])
             for agent in mm_traders:
                 run(agent, MM_env)
+            RT_env.run(days_to_expiry/365, daily_price_path[step])
+            for agent in rt_traders:
+                run(agent, RT_env)
 
             # Each agent takes an action in t
             # for agent, env in ddpg_traders:
@@ -167,6 +184,7 @@ if __name__ == '__main__':
         
         print(f"  Episode {i+1} finished.")
         MM_env.indicator()
+        RT_env.indicator()
         
         # Move to the next day.
         current_date += timedelta(days=1)
@@ -179,9 +197,11 @@ if __name__ == '__main__':
             final_price = daily_price_path[-1]
             for agent in mm_traders:
                 agent.action_at_expiry(initial_price, final_price)
-            with open("C:\ProjectX\OptionsTrading\Market\master_trades.csv", 'w') as f:
-                        pass
             MM_env.action_at_expiry()
+
+            for agent in rt_traders:
+                agent.action_at_expiry(initial_price, final_price)
+            RT_env.action_at_expiry()
 
 
             # for agent, env in traders:
@@ -192,6 +212,9 @@ if __name__ == '__main__':
             
             days_to_expiry = option_time
             pass
+        
+            with open("C:\ProjectX\OptionsTrading\Market\master_trades.csv", 'w') as f:
+                        pass
     
         
     # Keep the final plot window open after the simulation finishes.

@@ -63,7 +63,11 @@ class MarketExchange:
             self.market_books[name] = new_book
 
     def get_book(self, ticker_name):
-        return self.market_books.get(ticker_name)
+        
+        
+        
+        
+        rn self.market_books.get(ticker_name)
     
     def update_market(self, new_underlying_price):#when underlyin price is changing the market needs to be updated
         self.underlying_price = new_underlying_price
