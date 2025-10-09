@@ -88,9 +88,9 @@ class AgentEnvironment:
                     cost = trade.price * trade.size * LOT_SIZE
                     
                     # Determine if we bought or sold
-                    if trade.maker_id == self.agent.agent_id:
+                    if trade.taker_id == self.agent.agent_id:
                         # We were the MAKER (our resting order got filled)
-                        if trade.maker_side == Side.BUY:
+                        if trade.taker_side == Side.BUY:
                             # Our BUY order was filled - we bought
                             self.portfolio[trade.ticker_id] += trade.size
                             self.cash_balance -= cost
@@ -130,10 +130,10 @@ class AgentEnvironment:
 
     def _handle_entry_logic(self, signal: int):
         """ Checks for opportunities to enter a new trade based on the RNN signal and a value check. """
-        # print(f"Agent{self.agent.agent_id}:signal={signal}")
+        print(f"Agent{self.agent.agent_id}:signal={signal}")
         if signal == 0:
             return
-
+        # print("ye hua tha")
         option_type = 'CE' if signal == 1 else 'PE'
         ticker_to_trade = f"STOCK_{self.exchange.atm}_{option_type}"
         book = self.exchange.get_book(ticker_to_trade)

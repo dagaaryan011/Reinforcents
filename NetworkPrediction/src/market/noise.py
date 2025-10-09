@@ -37,7 +37,7 @@ def generate_daily_price_path(current_date):
     # defining parameters for the GBM
     mu = 0.06
     sigma = 0.3
-    n = 375 # Number of steps in a trading day (e.g., one per minute)
+    n = 375# Number of steps in a trading day (e.g., one per minute)
     T = 1
     dt = T / n
 

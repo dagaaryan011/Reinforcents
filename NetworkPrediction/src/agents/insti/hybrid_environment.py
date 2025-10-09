@@ -141,6 +141,7 @@ class HybridAgentEnvironment:
         # REST OF ORIGINAL LOGIC...
         book = self.exchange.get_book(ticker_to_trade)
         if not book: 
+            print("idhar error  - 1")
             return None
         current_position = self.portfolio.get(ticker_to_trade, 0)
         order_side = Side.BUY if trade_strength > 0 else Side.SELL
@@ -154,6 +155,7 @@ class HybridAgentEnvironment:
         elif order_side == Side.SELL and book.get_bids():
             price = book.get_bids()[0][0]
         else:
+            print("error -2")
             return None
 
         base_size = max(1, int(abs(trade_strength) * 50))

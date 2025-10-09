@@ -2,6 +2,7 @@ from ...market.orderbook import Order, Side
 from config import LOT_SIZE
 from collections import defaultdict
 import numpy as np
+import random
 #TODO change the limit of the amount an option can be bought
 class Broker:
     def __init__(self):
@@ -146,7 +147,9 @@ class Broker:
     #     # return done_buy_price, done_sell_price, done_buy_size, done_sell_size
     def update_book(self, ticker, b_p, a_p, b_s, a_s, agent_id):
         """Place buy/sell orders and handle executions"""
+        
         # Place buy order
+
         buy_order = Order(Side.BUY, b_p, b_s, agent_id)
         buy_trades = self.env.exchange.get_book(ticker).add_order(buy_order)
 

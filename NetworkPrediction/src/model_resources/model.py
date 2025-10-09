@@ -15,7 +15,7 @@ SEQUENCE_LENGTH = 30
 NUM_FEATURES = 5
 
 class StockLSTM(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, num_layers=2, dropout=0.3):
+    def __init__(self, input_size, hidden_size, output_size, num_layers=2, dropout=0.3, device="cuda"):
         super(StockLSTM, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
@@ -26,8 +26,8 @@ class StockLSTM(nn.Module):
 
     def forward(self, x):
 
-        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size)
-        c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size)
+        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size, device=x.device)
+        c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size, device=x.device)
         out, (h, c) = self.lstm(x, (h0, c0))
         h = h.detach()
         c = c.detach()
@@ -43,9 +43,11 @@ class Network_Utils:
         self.input_size = 5
         self.hidden_size = 30
         self.output_size = 3
+        self.device = "cpu"
+        # self.load_model_default()
 
     def build_model(self, model_path):
-        self.main_network = StockLSTM(self.input_size, self.hidden_size, self.output_size)
+        self.main_network = StockLSTM(self.input_size, self.hidden_size, self.output_size).to(self.device)
         self.loss_function = nn.CrossEntropyLoss()
         self.optimiser = optim.Adam(self.main_network.parameters(), lr=self.l_r)
         torch.save(self.main_network.state_dict(), model_path)
@@ -54,13 +56,13 @@ class Network_Utils:
         self.load_model(model_path=model_path)
         dataset = TensorDataset(x, y)
         loader = DataLoader(dataset, batch_size=32, shuffle=True)
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.main_network.to(device)
+        # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.main_network.to(self.device)
         for epoch in range(self.epoch):
 
             total_loss = 0.0
             for X_batch, y_batch in loader:
-                X_batch, y_batch = X_batch.to(device), y_batch.to(device)
+                X_batch, y_batch = X_batch.to(self.device), y_batch.to(self.device)
 
                 self.optimiser.zero_grad()
                 output = self.main_network(X_batch)
@@ -78,14 +80,15 @@ class Network_Utils:
 
 
     def load_model_default(self):
-        self.main_network = StockLSTM(self.input_size, self.hidden_size, self.output_size)
+        self.main_network = StockLSTM(self.input_size, self.hidden_size, self.output_size).to(self.device)
         self.main_network.load_state_dict(torch.load("model_rnn_1.pth"))
         self.loss_function = nn.CrossEntropyLoss()
         self.optimiser = optim.Adam(self.main_network.parameters(), lr=self.l_r)
 
     def load_model(self, model_path:str):
-        self.main_network = StockLSTM(self.input_size, self.hidden_size, self.output_size)
+        self.main_network = StockLSTM(self.input_size, self.hidden_size, self.output_size).to(self.device)
         self.main_network.load_state_dict(torch.load(model_path))
+        self.main_network = self.main_network.to(self.device)
         self.loss_function = nn.CrossEntropyLoss()
         self.optimiser = optim.Adam(self.main_network.parameters(), lr=self.l_r)
 
@@ -97,11 +100,14 @@ class Network_Utils:
         return output
     # Add this function to model.py
 
-def check_accuracy(model, x_test, y_test):
+def check_accuracy(model, x_test, y_test, device="cpu"):
         """ Checks the model's accuracy on unseen test data. """
         print("--- Checking accuracy on test data... ---")
 
         # Set the model to evaluation mode
+        x_test = x_test.to(device)
+        y_test = y_test.to(device)
+        model = model.to(device)
         model.eval()
 
         # Disable gradient calculations for efficiency
@@ -124,54 +130,7 @@ def check_accuracy(model, x_test, y_test):
 
         # Set the model back to training mode
         model.train()
-#{ model = keras.Sequential([
-#         keras.layers.LSTM(64, return_sequences=True, input_shape=(SEQUENCE_LENGTH, NUM_FEATURES)),
-#         keras.layers.Dropout(0.2),
-#         keras.layers.LSTM(32),
-#         keras.layers.Dropout(0.2),
-#         keras.layers.Dense(32, activation='relu'),
-#         keras.layers.Dense(3, activation='softmax')
-#     ])
 
-# model.compile(optimizer='adam',
-#                   loss='sparse_categorical_crossentropy',
-#                   metrics=['accuracy'])
-
-# model.save("models/model_rnn_1.keras")}
-
-# if __name__ == "__main__":
-#     x_list = []
-#     y_list = []
-    
-#     for i in range(1,31):
-#         training_data_path = rf"D:\NetworkPrediction\data\training_data\training_data{i}.npy"
-#         data_matrix = np.load(training_data_path,allow_pickle=True)
-#         x_list.extend(row[0] for row in data_matrix)
-        
-#         # IMPORTANT: Convert labels from [-1, 0, 1] to [0, 1, 2] for CrossEntropyLoss
-#         y_list.extend(row[1] + 1 for row in data_matrix)
-# # 
-#     # Convert the lists of data into PyTorch Tensors
-#     x_tensor = torch.tensor(np.array(x_list), dtype=torch.float32)
-#     print(f"Input data contains NaN: {torch.isnan(x_tensor).any()}")
-#     print(f"Input data contains Inf: {torch.isinf(x_tensor).any()}")
-#     y_tensor = torch.tensor(y_list, dtype=torch.long)
-#     x_train, x_test, y_train, y_test = train_test_split(
-#         x_tensor, y_tensor, test_size=0.2, random_state=42
-#     )
-#     obj1 = Network_Utils()
-#     model_save_path = r"D:\NetworkPrediction\data\models\retail\model_rnn_2.pth"
-#     obj1.build_model(model_path=model_save_path)
-#     obj1.load_model(model_path=model_save_path)
-#     # 
-#     obj1.train(x_train,y_train,model_path=model_save_path)
-# # 
-#     check_accuracy(obj1.main_network, x_test, y_test)
-
-#     for i in range(300, 400):
-#         data = torch.tensor([x_test[i].tolist()])
-#         output = obj1.output(data)
-#         print(f"{output}:{y_test[i]}")
 
 
 if __name__ == "__main__":
@@ -180,6 +139,7 @@ if __name__ == "__main__":
     from sklearn.model_selection import train_test_split
     import os
 
+    DEVICE = "cuda"
     # === Personality Masks ===
     PERSONALITY_MASKS = {
         "Momentum Trader": torch.tensor([1, 1, 1, 0, 0], dtype=torch.bool),
@@ -196,8 +156,8 @@ if __name__ == "__main__":
         x_list.extend(row[0] for row in data_matrix)
         y_list.extend(row[1] + 1 for row in data_matrix)  # [-1,0,1] → [0,1,2]
 
-    x_tensor = torch.tensor(np.array(x_list), dtype=torch.float32)
-    y_tensor = torch.tensor(y_list, dtype=torch.long)
+    x_tensor = torch.tensor(np.array(x_list), dtype=torch.float32, device=DEVICE)
+    y_tensor = torch.tensor(y_list, dtype=torch.long, device=DEVICE)
 
     print(f"Dataset loaded: X={x_tensor.shape}, y={y_tensor.shape}")
     print(f"NaN: {torch.isnan(x_tensor).any()}, Inf: {torch.isinf(x_tensor).any()}")
@@ -218,6 +178,10 @@ if __name__ == "__main__":
 
         # Initialize and train
         obj = Network_Utils()
+        # remeber to update the device
+        # eg:
+        # obj.device = "cpu"
+        # obj.device = "cuda"
         model_save_path = rf"D:\NetworkPrediction\data\models\retail\{personality_name}.pth"
 
         obj.build_model(model_path=model_save_path)

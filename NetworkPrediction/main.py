@@ -31,9 +31,9 @@ if __name__ == "__main__":
     print("--- Configuring Simulation ---")
     
     # Agent Counts
-    N_INSTI_AGENTS = 100
-    N_MM_AGENTS = 1000
-    N_RETAIL_AGENTS = 1900
+    N_INSTI_AGENTS = 5
+    N_MM_AGENTS = 2
+    N_RETAIL_AGENTS = 10
     
     # Time and Episode Parameters
     n_episodes = 300
@@ -61,6 +61,7 @@ plot = LiveTradingDashboard()
 data_manager = DataManager()
 
 # 1. Initialize Institutional Agents ONCE
+
 insti_agents, insti_envs = [], []
 temp_env = HybridAgentEnvironment(agent=None, exchange=initial_exchange)
 for j in range(N_INSTI_AGENTS):
@@ -105,13 +106,7 @@ retail_envs = [RetailEnv(agent=agent, exchange=exchange) for agent in retail_age
 mm_env.exchange = exchange
 for agent in mm_agents:
     agent.broker.env = mm_env
-print(f"MM Agents count: {len(mm_agents)}")
-if mm_agents:
-    print(f"First MM agent ID: {mm_agents[0].agent_id}")
-    print(f"First MM agent type: {type(mm_agents[0])}")
-    print(f"First MM agent attributes: {[attr for attr in dir(mm_agents[0]) if not attr.startswith('_')]}")
-else:
-    print("❌ MM agents list is EMPTY!")
+
 for i in range(n_episodes):
     # --- Daily Setup: Find next valid trading day ---
     daily_price_path = generate_daily_price_path(current_date)
