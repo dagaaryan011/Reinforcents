@@ -18,31 +18,58 @@ class Broker:
         self.cash_settlement = {}
 
         self.env = None    # one common connected to the market
-    def _calculate_portfolio_value(self):
-        """
-        Calculates the total net worth of the agent.
-        Value = Cash + (Stock Inventory * Stock Price) + (Value of Option Positions)
-        """
-        # 1. Start with the current cash balance
-        value = self.capital
+    # def _calculate_portfolio_value(self):
+    #     """
+    #     Calculates the total net worth of the agent.
+    #     Value = Cash + (Stock Inventory * Stock Price) + (Value of Option Positions)
+    #     """
+    #     # 1. Start with the current cash balance
+    #     value = self.capital
 
-        # 2. Add the value of the underlying stock inventory
-        # (Assuming self.inventory is the number of shares of the underlying stock)
+    #     # 2. Add the value of the underlying stock inventory
+    #     # (Assuming self.inventory is the number of shares of the underlying stock)
+    #     stock_price = self.env.exchange.underlying_price
+    #     value += self.inventory * stock_price
+
+    #     # 3. Add the value of all open option positions
+    #     for ticker, quantity in self.portfolio.items():
+    #         if quantity == 0:
+    #             continue
+            
+    #         book = self.env.exchange.get_book(ticker)
+    #         # Use the best bid to get a conservative "mark-to-market" price
+    #         if book and book.get_bids():
+    #             market_price = book.get_bids()[0][0]
+    #             value += quantity * market_price * LOT_SIZE
+        
+    #     # Store the calculated value and return it
+    #     self.portfolio_value = value
+    #     return value
+    def _calculate_portfolio_value(self):
+        value = self.capital
         stock_price = self.env.exchange.underlying_price
         value += self.inventory * stock_price
 
-        # 3. Add the value of all open option positions
         for ticker, quantity in self.portfolio.items():
             if quantity == 0:
                 continue
             
             book = self.env.exchange.get_book(ticker)
-            # Use the best bid to get a conservative "mark-to-market" price
-            if book and book.get_bids():
-                market_price = book.get_bids()[0][0]
-                value += quantity * market_price * LOT_SIZE
-        
-        # Store the calculated value and return it
+            if not book:
+                continue
+
+            # Long positions: value at bid (what you can sell for)
+            if quantity > 0 and book.get_bids():
+                price = book.get_bids()[0][0]
+            # Short positions: value at ask (what you can buy back for)  
+            elif quantity < 0 and book.get_asks():
+                price = book.get_asks()[0][0]
+            else:
+                # Fallback: use mid-price or zero
+                continue
+
+            value += quantity * price * LOT_SIZE
+
         self.portfolio_value = value
         return value
     def get_actual_state(self,ticker):
@@ -137,8 +164,8 @@ class Broker:
             self.portfolio[ticker] -= trade.size
             self.capital += trade.price * trade.size * LOT_SIZE
 
-        print(f'buy_filled: {len(buy_trades)}')
-        print(f'sell_filled: {len(sell_trades)}')
+        # print(f'buy_filled: {len(buy_trades)}')
+        # print(f'sell_filled: {len(sell_trades)}')
         # Return simple summary
         # return {
         #     'buy_filled': len(buy_trades),

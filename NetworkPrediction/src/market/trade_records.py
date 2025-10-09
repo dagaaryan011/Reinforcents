@@ -3,9 +3,9 @@
 
 import pandas as pd
 from pathlib import Path
-
+from config import Trades_CSV_path
 class TradeLedger:
-    def __init__(self, file_path="C:\ProjectX\OptionsTrading\Market\master_trades.csv"):
+    def __init__(self, file_path=Trades_CSV_path):
         self.trades_file = Path(file_path)
         self.trades_file.parent.mkdir(parents=True, exist_ok=True)
         self.trades = []

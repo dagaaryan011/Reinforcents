@@ -131,7 +131,9 @@ class HybridAgentEnvironment:
         max_action_index = np.argmax(np.abs(action))
         trade_strength = action[max_action_index]
         ticker_to_trade = self.active_tickers[max_action_index]
-
+        current_position = self.portfolio.get(ticker_to_trade, 0)
+        order_side = Side.BUY if trade_strength > 0 else Side.SELL
+        print(f"DEBUG: Agent {self.agent.agent_id} - Ticker: {ticker_to_trade}, Current Pos: {current_position}, Side: {order_side}, Strength: {trade_strength:.3f}")
         # NEW: Only trade if we have sufficient conviction
         if abs(trade_strength) < 0.2:
             return None
@@ -140,13 +142,13 @@ class HybridAgentEnvironment:
         book = self.exchange.get_book(ticker_to_trade)
         if not book: 
             return None
-
+        current_position = self.portfolio.get(ticker_to_trade, 0)
         order_side = Side.BUY if trade_strength > 0 else Side.SELL
 
         # Check if we can actually sell what we don't own
-        if order_side == Side.SELL and self.portfolio.get(ticker_to_trade, 0) <= 0:
-            return None
-
+        order_side = Side.BUY if trade_strength > 0 else Side.SELL
+    
+        
         if order_side == Side.BUY and book.get_asks():
             price = book.get_asks()[0][0]
         elif order_side == Side.SELL and book.get_bids():
@@ -155,7 +157,18 @@ class HybridAgentEnvironment:
             return None
 
         base_size = max(1, int(abs(trade_strength) * 50))
-
+    
+        if order_side == Side.BUY:
+            potential_new_position = current_position + base_size
+            if potential_new_position > 50:  # Would exceed long limit
+                base_size = min(50 - current_position,base_size)
+                
+        else:  # SELL
+            potential_new_position = current_position - base_size  
+            if potential_new_position < -50:  # Would exceed short limit
+                base_size = max(-50 - current_position , base_size )
+                
+    
         # Create and submit order
         order = Order(order_side, price, base_size, self.agent.agent_id)
         executed_trades = book.add_order(order)

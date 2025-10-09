@@ -18,7 +18,7 @@ from ...tools.functions import (
 )
 from config import (
     SEQUENCE_LENGTH, AGENT_FPERSONALITIES,
-    LONG_TERM_INDICATORS, SHORT_TERM_INDICATORS
+    LONG_TERM_INDICATORS, SHORT_TERM_INDICATORS,BASE_path_INSTI_AGENT
 )
 
 
@@ -119,7 +119,7 @@ class Agent_Insti:
             target_param.data.copy_(tau * param.data + (1.0 - tau) * target_param.data)
     def save_models(self, slot: int):
         """Save Actor and Critic networks to specific slot (0-9)"""
-        base_path = r"D:\NetworkPrediction\data\models\Insti"
+        base_path = BASE_path_INSTI_AGENT
         os.makedirs(base_path, exist_ok=True)
         
         torch.save(self.actor.state_dict(), os.path.join(base_path, f'Actor{slot}.pth'))
@@ -131,7 +131,7 @@ class Agent_Insti:
     
     def load_models(self, slot: int):
         """Load networks from specific slot"""
-        base_path = r"D:\NetworkPrediction\data\models\Insti"
+        base_path  = BASE_path_INSTI_AGENT
         
         try:
             self.actor.load_state_dict(torch.load(os.path.join(base_path, f'Actor{slot}.pth')))

@@ -33,7 +33,6 @@ class Agent:
     def __init__(self, agent_id: int):
         
         self.agent_id = agent_id
-        self.main_network = Network_Utils()
         
         # --- Choose a random trading personality ---
         self.indicator_focus = random.choice(AGENT_FPERSONALITIES)
@@ -45,8 +44,8 @@ class Agent:
                 break
 
         # --- Build and load model ---
-        self.main_network = Network_Utils()
-        self.main_network.load_model(model_path)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.main_network = Network_Utils().to(self.device)
 
         print(f"--- Initialized Agent {self.agent_id} with focus: {self.indicator_focus} ---")
         print(f"--- Loaded model from: {model_path} ---")
@@ -134,7 +133,7 @@ class Agent:
         input_sequence_np = np.expand_dims(input_sequence_np, axis=0)
 
         # --- 3. THIS IS THE FIX: Convert NumPy array to a PyTorch Tensor ---
-        input_tensor = torch.from_numpy(input_sequence_np)
+        input_tensor = torch.from_numpy(input_sequence_np).to(self.device)
 
         # 4. Pass the TENSOR to your network's output method
         return self.main_network.output(input_tensor)

@@ -1,0 +1,290 @@
+{
+  "price_timestamps": [
+    "2025-10-09T12:09:59.900204",
+    "2025-10-09T12:10:13.271439",
+    "2025-10-09T12:10:26.999614",
+    "2025-10-09T12:10:40.311995",
+    "2025-10-09T12:10:54.546066"
+  ],
+  "price_values": [
+    1164.066351583663,
+    1165.1292480247805,
+    1165.4428134536208,
+    1165.8898319580667,
+    1166.0464212225522
+  ],
+  "best_insti_portfolio": {
+    "timestamps": [
+      "2025-10-09T12:09:59.900204",
+      "2025-10-09T12:10:13.271439",
+      "2025-10-09T12:10:26.999614",
+      "2025-10-09T12:10:40.311995",
+      "2025-10-09T12:10:54.546066"
+    ],
+    "values": [
+      1000000.0,
+      1000000.0,
+      1000000.0,
+      1000000.0,
+      1000000.0
+    ],
+    "current_value": 1000000.0,
+    "profit_pct": 0.0,
+    "agent_id": "Insti_0"
+  },
+  "best_mm_portfolio": {
+    "timestamps": [
+      "2025-10-09T12:09:59.900204",
+      "2025-10-09T12:10:13.271439",
+      "2025-10-09T12:10:26.999614",
+      "2025-10-09T12:10:40.311995",
+      "2025-10-09T12:10:54.546066"
+    ],
+    "values": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "current_value": 0.0,
+    "profit_pct": 0.0,
+    "agent_id": "MM_0"
+  },
+  "best_retail_portfolio": {
+    "timestamps": [
+      "2025-10-09T12:09:59.900204",
+      "2025-10-09T12:10:13.271439",
+      "2025-10-09T12:10:26.999614",
+      "2025-10-09T12:10:40.311995",
+      "2025-10-09T12:10:54.546066"
+    ],
+    "values": [
+      100000.0,
+      100000.0,
+      100000.0,
+      100000.0,
+      100000.0
+    ],
+    "current_value": 100000.0,
+    "profit_pct": 0.0,
+    "agent_id": "Retail_0"
+  },
+  "insti_leaderboard": [
+    {
+      "name": "Insti_0",
+      "profit_pct": 0.0,
+      "portfolio_value": 1000000.0,
+      "starting_value": 1000000.0,
+      "trades": 0.0
+    },
+    {
+      "name": "Insti_1",
+      "profit_pct": 0.0,
+      "portfolio_value": 1000000.0,
+      "starting_value": 1000000.0,
+      "trades": 0.0
+    },
+    {
+      "name": "Insti_2",
+      "profit_pct": 0.0,
+      "portfolio_value": 1000000.0,
+      "starting_value": 1000000.0,
+      "trades": 0.0
+    },
+    {
+      "name": "Insti_3",
+      "profit_pct": 0.0,
+      "portfolio_value": 1000000.0,
+      "starting_value": 1000000.0,
+      "trades": 0.0
+    },
+    {
+      "name": "Insti_4",
+      "profit_pct": 0.0,
+      "portfolio_value": 1000000.0,
+      "starting_value": 1000000.0,
+      "trades": 0.0
+    },
+    {
+      "name": "Insti_5",
+      "profit_pct": 0.0,
+      "portfolio_value": 1000000.0,
+      "starting_value": 1000000.0,
+      "trades": 0.0
+    },
+    {
+      "name": "Insti_6",
+      "profit_pct": 0.0,
+      "portfolio_value": 1000000.0,
+      "starting_value": 1000000.0,
+      "trades": 0.0
+    },
+    {
+      "name": "Insti_7",
+      "profit_pct": 0.0,
+      "portfolio_value": 1000000.0,
+      "starting_value": 1000000.0,
+      "trades": 0.0
+    },
+    {
+      "name": "Insti_8",
+      "profit_pct": 0.0,
+      "portfolio_value": 1000000.0,
+      "starting_value": 1000000.0,
+      "trades": 0.0
+    },
+    {
+      "name": "Insti_9",
+      "profit_pct": 0.0,
+      "portfolio_value": 1000000.0,
+      "starting_value": 1000000.0,
+      "trades": 0.0
+    }
+  ],
+  "mm_leaderboard": [
+    {
+      "name": "MM_0",
+      "profit_pct": 0.0,
+      "portfolio_value": 0.0,
+      "starting_value": 0.0,
+      "trades": 0.0
+    },
+    {
+      "name": "MM_1",
+      "profit_pct": 0.0,
+      "portfolio_value": 0.0,
+      "starting_value": 0.0,
+      "trades": 0.0
+    },
+    {
+      "name": "MM_2",
+      "profit_pct": 0.0,
+      "portfolio_value": 0.0,
+      "starting_value": 0.0,
+      "trades": 0.0
+    },
+    {
+      "name": "MM_3",
+      "profit_pct": 0.0,
+      "portfolio_value": 0.0,
+      "starting_value": 0.0,
+      "trades": 0.0
+    },
+    {
+      "name": "MM_4",
+      "profit_pct": 0.0,
+      "portfolio_value": 0.0,
+      "starting_value": 0.0,
+      "trades": 0.0
+    },
+    {
+      "name": "MM_5",
+      "profit_pct": 0.0,
+      "portfolio_value": 0.0,
+      "starting_value": 0.0,
+      "trades": 0.0
+    },
+    {
+      "name": "MM_6",
+      "profit_pct": 0.0,
+      "portfolio_value": 0.0,
+      "starting_value": 0.0,
+      "trades": 0.0
+    },
+    {
+      "name": "MM_7",
+      "profit_pct": 0.0,
+      "portfolio_value": 0.0,
+      "starting_value": 0.0,
+      "trades": 0.0
+    },
+    {
+      "name": "MM_8",
+      "profit_pct": 0.0,
+      "portfolio_value": 0.0,
+      "starting_value": 0.0,
+      "trades": 0.0
+    },
+    {
+      "name": "MM_9",
+      "profit_pct": 0.0,
+      "portfolio_value": 0.0,
+      "starting_value": 0.0,
+      "trades": 0.0
+    }
+  ],
+  "retail_leaderboard": [
+    {
+      "name": "Retail_0",
+      "profit_pct": 0.0,
+      "portfolio_value": 100000.0,
+      "starting_value": 100000.0,
+      "trades": 0.0
+    },
+    {
+      "name": "Retail_1",
+      "profit_pct": 0.0,
+      "portfolio_value": 100000.0,
+      "starting_value": 100000.0,
+      "trades": 0.0
+    },
+    {
+      "name": "Retail_2",
+      "profit_pct": 0.0,
+      "portfolio_value": 100000.0,
+      "starting_value": 100000.0,
+      "trades": 0.0
+    },
+    {
+      "name": "Retail_3",
+      "profit_pct": 0.0,
+      "portfolio_value": 100000.0,
+      "starting_value": 100000.0,
+      "trades": 0.0
+    },
+    {
+      "name": "Retail_4",
+      "profit_pct": 0.0,
+      "portfolio_value": 100000.0,
+      "starting_value": 100000.0,
+      "trades": 0.0
+    },
+    {
+      "name": "Retail_5",
+      "profit_pct": 0.0,
+      "portfolio_value": 100000.0,
+      "starting_value": 100000.0,
+      "trades": 0.0
+    },
+    {
+      "name": "Retail_6",
+      "profit_pct": 0.0,
+      "portfolio_value": 100000.0,
+      "starting_value": 100000.0,
+      "trades": 0.0
+    },
+    {
+      "name": "Retail_7",
+      "profit_pct": 0.0,
+      "portfolio_value": 100000.0,
+      "starting_value": 100000.0,
+      "trades": 0.0
+    },
+    {
+      "name": "Retail_8",
+      "profit_pct": 0.0,
+      "portfolio_value": 100000.0,
+      "starting_value": 100000.0,
+      "trades": 0.0
+    },
+    {
+      "name": "Retail_9",
+      "profit_pct": 0.0,
+      "portfolio_value": 100000.0,
+      "starting_value": 100000.0,
+      "trades": 0.0
+    }
+  ],
+  "last_update": "2025-10-09T12:10:54.550468"
+}

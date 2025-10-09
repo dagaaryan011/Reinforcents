@@ -9,7 +9,8 @@ from datetime import date, timedelta
 from src.market.exchange import MarketExchange
 from src.market.noise import generate_daily_price_path
 from src.market.orderbook import Side
-
+from visualizer import LiveTradingDashboard
+from data_manager import DataManager
 # --- 2 Agent  ---
 
 # Institutional (DDPG) Agents
@@ -30,13 +31,13 @@ if __name__ == "__main__":
     print("--- Configuring Simulation ---")
     
     # Agent Counts
-    N_INSTI_AGENTS = 5
-    N_MM_AGENTS = 2
-    N_RETAIL_AGENTS = 10
+    N_INSTI_AGENTS = 100
+    N_MM_AGENTS = 1000
+    N_RETAIL_AGENTS = 1900
     
     # Time and Episode Parameters
     n_episodes = 300
-    option_cycle_days = 2
+    option_cycle_days = 5
     start_date = date(2023, 1, 1)
     decision_frequency = 30
 
@@ -54,6 +55,10 @@ print("--- Initializing All Agents (One-Time Setup) ---")
 
 # Create initial exchange for agent setup
 initial_exchange = MarketExchange(underlying_price=1000.0)  # Temporary price
+
+# Visualizer
+plot = LiveTradingDashboard()
+data_manager = DataManager()
 
 # 1. Initialize Institutional Agents ONCE
 insti_agents, insti_envs = [], []
@@ -100,7 +105,13 @@ retail_envs = [RetailEnv(agent=agent, exchange=exchange) for agent in retail_age
 mm_env.exchange = exchange
 for agent in mm_agents:
     agent.broker.env = mm_env
-
+print(f"MM Agents count: {len(mm_agents)}")
+if mm_agents:
+    print(f"First MM agent ID: {mm_agents[0].agent_id}")
+    print(f"First MM agent type: {type(mm_agents[0])}")
+    print(f"First MM agent attributes: {[attr for attr in dir(mm_agents[0]) if not attr.startswith('_')]}")
+else:
+    print("❌ MM agents list is EMPTY!")
 for i in range(n_episodes):
     # --- Daily Setup: Find next valid trading day ---
     daily_price_path = generate_daily_price_path(current_date)
@@ -139,7 +150,8 @@ for i in range(n_episodes):
     
     # --- D. INTRADAY SIMULATION LOOP (Step-Driven) ---
     for step, price in enumerate(tqdm(daily_price_path, desc=f"Day {i+1} Progress")):
-        # ... rest of your existing intraday logic remains the same ...
+        
+        
         exchange.update_market(price)
         
         for agent in insti_agents: agent.preprocess_input(price)
@@ -161,7 +173,12 @@ for i in range(n_episodes):
             # # 3. RETAIL AGENTS ACT
             for env in retail_envs:
                 env.make_decision()
-    
+        data_manager.update_live_data(
+        new_price=price,
+        insti_envs=insti_envs,
+        mm_agents=mm_agents,
+        retail_envs=retail_envs
+    )
     # --- E. END-OF-DAY LEARNING & REPORTING ---
     print(f"\n--- Day {i+1} Finished | Closing Price: {daily_price_path[-1]:.2f} ---")
     
@@ -183,9 +200,6 @@ for i in range(n_episodes):
     print("  --- Institutional Agent Portfolios ---")
     for env in insti_envs:
         print(f"    {env.agent.agent_id}: Value: {env.portfolio_value:,.2f}, Cash: {env.cash_balance:,.2f}, Pos: {dict(env.portfolio)}")
-    
-    print("  --- Market Maker Portfolios ---")
-    # (Assuming MM agent has `portfolio_value` and `cash_balance` attributes)
     
     print("  --- Market Maker Portfolios ---"); [print(f"    {agent.agent_id}: Value: {agent.broker.portfolio_value:,.2f}, Cash: {agent.broker.capital:,.2f}, Pos: {dict(agent.broker.portfolio)}") for agent in mm_agents]
         

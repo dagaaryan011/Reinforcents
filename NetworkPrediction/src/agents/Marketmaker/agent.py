@@ -7,19 +7,19 @@ import numpy as np
 import os
 from .networks import Selector, ActorNetwork, CriticNetwork, ValueNetwork
 from .broker import Broker
-
+from config import MODEL_DIR_MM
 class MarketMaker:
     def __init__(self, id):
 
         self.agent_id = id
         self.broker = Broker()
-
-        self.selector = Selector()
-        self.actor = ActorNetwork()
-        self.critic_1 = CriticNetwork()
-        self.critic_2 = CriticNetwork()
-        self.value = ValueNetwork()
-        self.target_value = ValueNetwork()
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.selector = Selector().to(self.device)
+        self.actor = ActorNetwork().to(self.device)
+        self.critic_1 = CriticNetwork().to(self.device)
+        self.critic_2 = CriticNetwork().to(self.device)
+        self.value = ValueNetwork().to(self.device)
+        self.target_value = ValueNetwork().to(self.device)
         
         self.tau = 0.005
         self.scale = 2.0
@@ -69,7 +69,7 @@ class MarketMaker:
 
         # 1. Define the simple base path string for your models
         #    This is the only line you'll need to change in the future.
-        model_dir = r"D:\NetworkPrediction\data\models\MarketMaker"
+        model_dir  = MODEL_DIR_MM
 
         # 2. A dictionary mapping the model names to the actual network objects
         models_to_load = {
@@ -88,7 +88,7 @@ class MarketMaker:
 
             try:
                 if os.path.isfile(path):
-                    network.load_state_dict(torch.load(path, map_location=torch.device('cpu')))
+                    network.load_state_dict(torch.load(path, map_location=self.device))
                     print(f"Successfully loaded {name} from: {path}")
                 else:
                     print(f"File not found for {name}: {path}")
@@ -149,7 +149,7 @@ class MarketMaker:
 
         for state in allstates:
             # Convert each state (list/np.array of shape (15,)) to tensor (1, 15)
-            state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
+            state_tensor = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
             a.append(state_tensor)
 
         selection = self.selector(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], 
@@ -158,7 +158,7 @@ class MarketMaker:
         return selection   # returns numpy of selectionn values
          
     def get_action(self, state):
-        tfstate =  torch.tensor([state], dtype=torch.float32)
+        tfstate =  torch.tensor([state], dtype=torch.float32, device = self.device)
         action, logprob = self.actor.sample_normal(tfstate, reparameterize=False)
         return action.detach().numpy(), logprob.detach().numpy()
     
@@ -249,16 +249,16 @@ class MarketMaker:
             
             all_states_list_of_samples, states, actions, rewards, new_states = self.sample_batch()
 
-            states = torch.tensor(states, dtype=torch.float)
-            states_ = torch.tensor(new_states, dtype=torch.float)
-            actions = torch.tensor(actions, dtype=torch.float)
+            states = torch.tensor(states, dtype=torch.float, device = self.device)
+            states_ = torch.tensor(new_states, dtype=torch.float, device = self.device)
+            actions = torch.tensor(actions, dtype=torch.float, device = self.device)
             actions = torch.squeeze(actions, 1)
-            rewards = torch.tensor(rewards, dtype=torch.float)
+            rewards = torch.tensor(rewards, dtype=torch.float, device = self.device)
 
             target_index = self.expiry_volumes_highest_index
-            target_labels = torch.full((self.batch_size,), target_index, dtype=torch.long)
+            target_labels = torch.full((self.batch_size,), target_index, dtype=torch.long, device = self.device)
 
-            all_states_tensor = torch.tensor(all_states_list_of_samples, dtype=torch.float) 
+            all_states_tensor = torch.tensor(all_states_list_of_samples, dtype=torch.float, device = self.device) 
             t = torch.unbind(all_states_tensor, axis=1) 
 
             

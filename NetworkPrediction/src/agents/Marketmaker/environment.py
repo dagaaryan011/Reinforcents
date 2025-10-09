@@ -3,7 +3,7 @@ import pandas as pd
 import csv
 from src.market.blackscholes import BlaScho
 from src.market.orderbook import Order, Side
-
+from config import Trades_CSV_path
 
 class Env:
     def __init__(self):
@@ -84,7 +84,7 @@ class Env:
             self.total_volumes[ticker] += daily_volume/1000
 
 
-    def get_executed_count(self, target, column="Ticker", filepath="C:\ProjectX\OptionsTrading\Market\master_trades.csv"):   #for calulating vol (no of matched/executed trades) for each day
+    def get_executed_count(self, target, column="Ticker", filepath=Trades_CSV_path):   #for calulating vol (no of matched/executed trades) for each day
         count = 0
         with open(filepath, 'r', newline='') as file:
             reader = csv.DictReader(file)
@@ -208,19 +208,19 @@ class Env:
             # print(self.tickers_list)
             self.set_total_volumes_dict()
             self.get_trend(price)
-            print("first, first", self.days_passed, self.mins_passed)
+            # print("first, first", self.days_passed, self.mins_passed)
         elif self.days_passed > 0 and self.mins_passed <= 0 :
             self.trend = []
             self.get_trend(price)
             self.every_min()
-            print("other, first", self.days_passed, self.mins_passed)
+            # print("other, first", self.days_passed, self.mins_passed)
         elif self.days_passed <= 0 :
             self.get_trend(price)
-            print("first, other", self.days_passed, self.mins_passed)
+            # print("first, other", self.days_passed, self.mins_passed)
         else :
             self.every_min()
             self.get_trend(price)
-            print("other, other", self.days_passed, self.mins_passed)
+            # print("other, other", self.days_passed, self.mins_passed)
 
 
 def run(agent, env):
