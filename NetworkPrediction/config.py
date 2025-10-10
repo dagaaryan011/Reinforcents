@@ -30,11 +30,11 @@ NUM_FEATURES = len(FEATURE_LIST)
 # --- 2. File & Directory Paths ---
 
 MODEL_PATH = "data/models/"
-TRAINING_DATA_PATH = "data/training_data/"
-PRICE_DATA_CSV = r"D:\NetworkPrediction\misceleaneous\test_price_data.csv"
-BASE_path_INSTI_AGENT = r"D:\NetworkPrediction\data\models\Insti" 
-MODEL_DIR_MM  = r"D:\NetworkPrediction\data\models\MarketMaker"
-Trades_CSV_path =r"D:\NetworkPrediction\src\market\master_trades.csv"
+TRAINING_DATA_PATH = "/content/Reinforcents/NetworkPrediction/data/training_data"
+PRICE_DATA_CSV = r"/content/Reinforcents/NetworkPrediction/misceleaneous/test_price_data.csv"
+BASE_path_INSTI_AGENT = r"/content/Reinforcents/NetworkPrediction/data/models/insti" 
+MODEL_DIR_MM  = r"/content/Reinforcents/NetworkPrediction/data/models/MarketMaker"
+Trades_CSV_path =r"/content/Reinforcents/NetworkPrediction/src/market/master_trades.csv"
 # --- 3. Training Hyperparameters ---
 
 EPOCHS = 20

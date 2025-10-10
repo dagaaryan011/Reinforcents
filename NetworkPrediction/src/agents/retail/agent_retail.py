@@ -23,10 +23,10 @@ from ...tools.functions import (
 )
 from config import SEQUENCE_LENGTH,FEATURE_LIST,AGENT_FPERSONALITIES,PERSONALITY_MODEL_NAMES,MODEL_BASE_PATH
 PERSONALITY_MODEL_PATHS = {
-    tuple(['macd', 'rsi', 'stoch']):              r"D:\NetworkPrediction\data\models\retail\Momentum Trader.pth",
-    tuple(['rsi', 'adx', 'status']):              r"D:\NetworkPrediction\data\models\retail\Trend Follower.pth",
-    tuple(['macd', 'stoch', 'status']):           r"D:\NetworkPrediction\data\models\retail\Hybrid Trader.pth",
-    tuple(['macd', 'rsi', 'stoch', 'adx', 'status']): r"D:\NetworkPrediction\data\models\retail\All-Rounder.pth",
+    tuple(['macd', 'rsi', 'stoch']):              r"/content/Reinforcents/NetworkPrediction/data/models/retail/Momentum Trader.pth",
+    tuple(['rsi', 'adx', 'status']):              r"/content/Reinforcents/NetworkPrediction/data/models/retail/Trend Follower.pth",
+    tuple(['macd', 'stoch', 'status']):           r"/content/Reinforcents/NetworkPrediction/data/models/retail/Hybrid Trader.pth",
+    tuple(['macd', 'rsi', 'stoch', 'adx', 'status']): r"/content/Reinforcents/NetworkPrediction/data/models/retail/All-Rounder.pth",
 }
 
 class Agent:
