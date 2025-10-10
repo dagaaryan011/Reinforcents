@@ -1,15 +1,15 @@
-# main.py
 
 import torch
 import numpy as np
 from tqdm import tqdm
 from datetime import date, timedelta
+from src.tools.dashboard_updater import update_data, clear_data
 
 # ---  Market  ---
 from src.market.exchange import MarketExchange
 from src.market.noise import generate_daily_price_path
 from src.market.orderbook import Side
-
+from src.tools.async_creator import async_batch_creator
 # --- 2 Agent  ---
 
 # Institutional (DDPG) Agents
@@ -28,7 +28,7 @@ from src.agents.retail.agent_retail_env import AgentEnvironment as RetailEnv
 
 if __name__ == "__main__":
     print("--- Configuring Simulation ---")
-    
+    clear_data()
     # Agent Counts
     N_INSTI_AGENTS = 10
     N_MM_AGENTS = 100
@@ -43,7 +43,7 @@ if __name__ == "__main__":
     # Device Setup
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # --- B. SHARED & PRE-LOADED COMPONENTS ---
+    
     
     print("--- Loading Shared RNN Context Model for Institutional Agents... ---")
 insti_rnn_model = LongTermModel().to(device)
@@ -55,8 +55,10 @@ print("--- Initializing All Agents (One-Time Setup) ---")
 # Create initial exchange for agent setup
 initial_exchange = MarketExchange(underlying_price=1000.0)  # Temporary price
 
-# Visualizer
 
+def calculate_retail_portfolio_value(env, current_price):
+    stock_value = sum(quantity * current_price for ticker, quantity in env.portfolio.items())
+    return env.cash_balance + stock_value
 
 # 1. Initialize Institutional Agents ONCE
 
@@ -140,33 +142,60 @@ for i in range(n_episodes):
         exchange.update_market(opening_price)
     
     print(f"--- Day {i+1}/{n_episodes} | Date: {current_date} | Expiry in: {days_to_expiry} days ---")
-    
+    batch1, batch2, batch3 = async_batch_creator(insti_agents, retail_agents, mm_agents)
+    all_batches = [batch1, batch2, batch3]
+
+    # Create a mapping from agent ID to its environment for easy lookup
+    insti_env_map = {env.agent.agent_id: env for env in insti_envs}
+    retail_env_map = {env.agent.agent_id: env for env in retail_envs}
     # --- D. INTRADAY SIMULATION LOOP (Step-Driven) ---
     for step, price in enumerate(tqdm(daily_price_path, desc=f"Day {i+1} Progress")):
         
-        
         exchange.update_market(price)
-        
         for agent in insti_agents: agent.preprocess_input(price)
         for env in retail_envs: env.update_state(price)
-        
         mm_env.run(days_to_expiry / 365.0, price)
-        
-        for agent in mm_agents:
-            run_mm_step(agent, mm_env)
+
+        # --- Loop through each batch sequentially ---
+        for batch in all_batches:
+            # Deconstruct the current batch
+            mm_agents_in_batch = batch[0]
+            insti_agents_in_batch = batch[1]
+            retail_agents_in_batch = batch[2]
+
+            # --- Run the Market Makers from this specific batch ---
+            for agent in mm_agents_in_batch:
+                run_mm_step(agent, mm_env)
             
-        if (step + 1) % decision_frequency == 0:
-            # 1. INSTITUTIONAL AGENTS ACT
-            for agent, env in zip(insti_agents, insti_envs):
-                current_observation = env.get_state()
-                action = agent.choose_action(current_observation)
-                new_observation, reward, done = env.step(action)
-                agent.remember(current_observation, action, reward, new_observation, done)
-                
-            # # 3. RETAIL AGENTS ACT
-            for env in retail_envs:
-                env.make_decision()
+            # --- Periodically run Insti and Retail agents from this specific batch ---
+            if (step + 1) % decision_frequency == 0:
+
+                # Run INSTITUTIONAL AGENTS in this batch
+                for agent in insti_agents_in_batch:
+                    env = insti_env_map[agent.agent_id]
+                    current_observation = env.get_state()
+                    action = agent.choose_action(current_observation)
+                    new_observation, reward, done = env.step(action)
+                    agent.remember(current_observation, action, reward, new_observation, done)
+
+                # Run RETAIL AGENTS in this batch
+                for agent in retail_agents_in_batch:
+                    env = retail_env_map[agent.agent_id]
+                    env.make_decision()
         
+
+        # 2. Gather all portfolio data into dictionaries
+        all_insti_portfolios = {env.agent.agent_id: env.portfolio_value for env in insti_envs}
+        all_mm_portfolios = {agent.agent_id: agent.broker.portfolio_value for agent in mm_agents}
+        all_retail_portfolios = {env.agent.agent_id: calculate_retail_portfolio_value(env, price) for env in retail_envs}
+
+        # 3. Call the single update function with all the new data
+        update_data(
+            price=price,
+            insti_portfolios=all_insti_portfolios,
+            mm_portfolios=all_mm_portfolios,
+            retail_portfolios=all_retail_portfolios
+        )
     # --- E. END-OF-DAY LEARNING & REPORTING ---
     print(f"\n--- Day {i+1} Finished | Closing Price: {daily_price_path[-1]:.2f} ---")
     

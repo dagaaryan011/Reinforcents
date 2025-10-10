@@ -1,9 +1,4 @@
-import os
-
-# --- 0. Kaggle Base Path ---
-# All other paths will be constructed from this base to ensure portability.
-KAGGLE_PROJECT_ROOT = "/kaggle/working/Reinforcents/NetworkPrediction"
-
+# In config.py
 
 # --- 1. Model & Data Configuration ---
 
@@ -13,14 +8,20 @@ SEQUENCE_LENGTH = 30
 # The master list of all possible indicators in the correct order.
 # This is crucial for the agent's feature masking.
 FEATURE_LIST = ['macd', 'rsi', 'stoch', 'status', 'adx']
-
-# Agent personalities defined by the features they use.
-AGENT_PERSONALITIES = [
+#agent personalities
+AGENT_FPERSONALITIES = [
     ['macd', 'rsi', 'stoch'],              # Momentum Trader
     ['rsi', 'adx', 'status'],               # Trend Follower
     ['macd', 'stoch', 'status'],            # Hybrid Trader
     ['macd', 'rsi', 'stoch', 'adx', 'status'] # All-Rounder
 ]
+MODEL_BASE_PATH = r"D:\NetworkPrediction\data\models\retail"
+PERSONALITY_MODEL_NAMES = {
+    'Momentum Trader': ['macd', 'rsi', 'stoch'],
+    'Trend Follower':  ['rsi', 'adx', 'status'],
+    'Hybrid Trader':   ['macd', 'stoch', 'status'],
+    'All-Rounder':     ['macd', 'rsi', 'stoch', 'adx', 'status']
+}
 
 # The total number of features in the input vector.
 NUM_FEATURES = len(FEATURE_LIST)
@@ -28,38 +29,16 @@ NUM_FEATURES = len(FEATURE_LIST)
 
 # --- 2. File & Directory Paths ---
 
-# Base path for retail agent models
-MODEL_BASE_PATH_RETAIL = os.path.join(KAGGLE_PROJECT_ROOT, "data/models/retail")
+MODEL_PATH = "data/models/"
+TRAINING_DATA_PATH = "data/training_data/"
+PRICE_DATA_CSV = r"D:\NetworkPrediction\misceleaneous\test_price_data.csv"
+BASE_path_INSTI_AGENT = r"D:\NetworkPrediction\data\models\Insti" 
+MODEL_DIR_MM  = r"D:\NetworkPrediction\data\models\MarketMaker"
+Trades_CSV_path =r"D:\NetworkPrediction\src\market\master_trades.csv"
 
-# A dictionary that maps agent personality names to their full .pth model file paths
-PERSONALITY_MODEL_PATHS = {
-    # The key (e.g., 'Momentum Trader') is used to generate the filename.
-    # Resulting path: /kaggle/working/Reinforcents/NetworkPrediction/data/models/retail/Momentum Trader.pth
-    name: os.path.join(MODEL_BASE_PATH_RETAIL, f"{name.replace(' ', '_')}.pth") 
-    for name in ['Momentum Trader', 'Trend Follower', 'Hybrid Trader', 'All-Rounder']
-}
-# Note: I've replaced spaces with underscores (e.g., 'Momentum_Trader.pth') 
-# as it's a safer practice for filenames.
-
-# General model directory
-MODEL_PATH = os.path.join(KAGGLE_PROJECT_ROOT, "data/models/")
-
-# Training data path
-TRAINING_DATA_PATH = os.path.join(KAGGLE_PROJECT_ROOT, "data/training_data")
-
-# Price data CSV file
-PRICE_DATA_CSV = os.path.join(KAGGLE_PROJECT_ROOT, "misceleaneous/test_price_data.csv")
-
-# Path for institutional agent models
-BASE_path_INSTI_AGENT = os.path.join(KAGGLE_PROJECT_ROOT, "data/models/insti")
-
-# Path for Market Maker models
-MODEL_DIR_MM = os.path.join(KAGGLE_PROJECT_ROOT, "data/models/MarketMaker")
-
-# Path for the master trades CSV log
-TRADES_CSV_PATH = os.path.join(KAGGLE_PROJECT_ROOT, "src/market/master_trades.csv")
-
-
+DATA_FILE = r"D:\Reinforcents\NetworkPrediction\data\visualisation\live_data.json"
+# config.py
+DATA_FILE_PATH = r"D:\Reinforcents\NetworkPrediction\data\visualisation\live_data.json"
 # --- 3. Training Hyperparameters ---
 
 EPOCHS = 20
@@ -78,11 +57,12 @@ NUM_AGENTS_IN_SIMULATION = 10
 # Agents will make a prediction every N steps.
 DECISION_FREQUENCY = 30
 
-# Lot size for the options
+#lot size for the options
 LOT_SIZE = 50
 
 
-# --- 5. Institutional Agent Specifics ---
+
+#insti
 
 LONG_TERM_INDICATORS = ['rsi', 'stoch', 'adx', 'status']
 SHORT_TERM_INDICATORS = ['macd', 'rsi', 'stoch']
