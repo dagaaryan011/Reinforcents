@@ -30,9 +30,9 @@ if __name__ == "__main__":
     print("--- Configuring Simulation ---")
     
     # Agent Counts
-    N_INSTI_AGENTS = 5
-    N_MM_AGENTS = 2
-    N_RETAIL_AGENTS = 10
+    N_INSTI_AGENTS = 10
+    N_MM_AGENTS = 100
+    N_RETAIL_AGENTS = 190
     
     # Time and Episode Parameters
     n_episodes = 300
