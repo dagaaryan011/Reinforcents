@@ -21,7 +21,7 @@ from ...tools.functions import (
     get_DX, 
     get_ADX
 )
-from config import SEQUENCE_LENGTH,FEATURE_LIST,AGENT_FPERSONALITIES,PERSONALITY_MODEL_NAMES,MODEL_BASE_PATH
+from config import SEQUENCE_LENGTH,FEATURE_LIST,PERSONALITY_MODEL_NAMES,MODEL_BASE_PATH
 PERSONALITY_MODEL_PATHS = {
     tuple(['macd', 'rsi', 'stoch']):              r"/content/Reinforcents/NetworkPrediction/data/models/retail/Momentum Trader.pth",
     tuple(['rsi', 'adx', 'status']):              r"/content/Reinforcents/NetworkPrediction/data/models/retail/Trend Follower.pth",
@@ -33,15 +33,14 @@ class Agent:
     def __init__(self, agent_id: int):
         
         self.agent_id = agent_id
-        
+        AGENT_FPERSONALITIES = list(PERSONALITY_MODEL_PATHS.keys())
         # --- Choose a random trading personality ---
         self.indicator_focus = random.choice(AGENT_FPERSONALITIES)
-
+        model_path = None
         # --- Determine model path automatically ---
-        for name, indicators in PERSONALITY_MODEL_NAMES.items():
-            if sorted(indicators) == sorted(self.indicator_focus):
-                model_path = os.path.join(MODEL_BASE_PATH, f"{name}.pth")
-                break
+        if self.indicator_focus in PERSONALITY_MODEL_PATHS:
+            model_path = PERSONALITY_MODEL_PATHS[self.indicator_focus]
+
 
         # --- Build and load model ---
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

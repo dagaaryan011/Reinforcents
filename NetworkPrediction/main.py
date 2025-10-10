@@ -9,8 +9,7 @@ from datetime import date, timedelta
 from src.market.exchange import MarketExchange
 from src.market.noise import generate_daily_price_path
 from src.market.orderbook import Side
-from visualizer import LiveTradingDashboard
-from data_manager import DataManager
+
 # --- 2 Agent  ---
 
 # Institutional (DDPG) Agents
@@ -57,8 +56,7 @@ print("--- Initializing All Agents (One-Time Setup) ---")
 initial_exchange = MarketExchange(underlying_price=1000.0)  # Temporary price
 
 # Visualizer
-plot = LiveTradingDashboard()
-data_manager = DataManager()
+
 
 # 1. Initialize Institutional Agents ONCE
 
@@ -168,12 +166,7 @@ for i in range(n_episodes):
             # # 3. RETAIL AGENTS ACT
             for env in retail_envs:
                 env.make_decision()
-        data_manager.update_live_data(
-        new_price=price,
-        insti_envs=insti_envs,
-        mm_agents=mm_agents,
-        retail_envs=retail_envs
-    )
+        
     # --- E. END-OF-DAY LEARNING & REPORTING ---
     print(f"\n--- Day {i+1} Finished | Closing Price: {daily_price_path[-1]:.2f} ---")
     
