@@ -1,12 +1,15 @@
 site_name: ReinforCents
 nav:
-  - Home: home.md
-  - Stocks and Options market : market.md
-  - Feature Engineering : features.md
-  - Agents : agents.md
-  - Reinforcement learning : rl.md
-  - Implementation : implement.md
-  - Future Scope : future.md
-  - Conclusion : conclusion.md
+- Home: home.md
+- Stocks and Options market : market.md
+- Feature Engineering : features.md
+- Agents : agents.md
+- Reinforcement learning : rl.md
+- Implementation : implement.md
+- Future Scope : future.md
+- Conclusion : conclusion.md
 theme: readthedocs
-site-url : https://github.com/dagaaryan011/Reinforcents
+
+site_url: https://dagaaryan011.github.io/Reinforcents/
+
+site_base: /Reinforcents/
