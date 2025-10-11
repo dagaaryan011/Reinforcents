@@ -71,42 +71,36 @@ class AgentEnvironment:
                     
     #                 if self.portfolio.get(trade.ticker_id) == 0:
     #                     del self.portfolio[trade.ticker_id]
+    # In agent_retail_env.py
+
     def _check_trade_confirmations(self):
-        """ Checks all active order books for trade notifications for this agent. """
+        """ Checks for notifications of passive (maker) trades for this agent. """
         for ticker_tuple in self.exchange.tickers:
             book = self.exchange.get_book(ticker_tuple[0])
             if book:
                 notifications = book.collect_notifications_for(self.agent.agent_id)
                 for trade in notifications:
-                    print(f"    CONFIRMED: Agent {self.agent.agent_id} trade executed: {trade}")
-                    
-                    # DEBUG: Check what data we actually have
-                    print(f"      DEBUG: taker_id={trade.taker_id}, maker_id={trade.maker_id}")
-                    print(f"      DEBUG: taker_side={trade.taker_side}, maker_side={trade.maker_side}")
-                    print(f"      DEBUG: our_id={self.agent.agent_id}")
-                    
-                    cost = trade.price * trade.size * LOT_SIZE
-                    
-                    # Determine if we bought or sold
-                    if trade.taker_id == self.agent.agent_id:
-                        # We were the MAKER (our resting order got filled)
-                        if trade.taker_side == Side.BUY:
-                            # Our BUY order was filled - we bought
+                    # Since this is a notification for a passive trade, our agent MUST be the maker.
+                    if trade.maker_id == self.agent.agent_id:
+                        print(f"    CONFIRMED (Passive): Agent {self.agent.agent_id} Maker trade executed: {trade}")
+                        cost_or_revenue = trade.price * trade.size * LOT_SIZE
+
+                        if trade.maker_side == Side.BUY:
+                            # Our resting BUY order was filled, so we BOUGHT
+                            print(f"      ACTION (Maker): Our resting BUY order filled: +{trade.size} {trade.ticker_id}")
                             self.portfolio[trade.ticker_id] += trade.size
-                            self.cash_balance -= cost
-                            print(f"      ACTION: Our BUY order filled: +{trade.size} {trade.ticker_id}")
-                        else:  # trade.maker_side == Side.SELL
-                            # Our SELL order was filled - we sold
+                            self.cash_balance -= cost_or_revenue
+                        else: # trade.maker_side == Side.SELL
+                            # Our resting SELL order was filled, so we SOLD
+                            print(f"      ACTION (Maker): Our resting SELL order filled: -{trade.size} {trade.ticker_id}")
                             self.portfolio[trade.ticker_id] -= trade.size
-                            self.cash_balance += cost
-                            print(f"      ACTION: Our SELL order filled: -{trade.size} {trade.ticker_id}")
-                    
-                    # Clean up zero positions
+                            self.cash_balance += cost_or_revenue
+
+                    # Clean up zero positions from the portfolio
                     if self.portfolio.get(trade.ticker_id) == 0:
                         del self.portfolio[trade.ticker_id]
-                    
-                    print(f"      UPDATED: Cash={self.cash_balance}, Portfolio={dict(self.portfolio)}")
-    
+
+                    print(f"      UPDATED: Cash={self.cash_balance:,.2f}, Portfolio={dict(self.portfolio)}")
     def _handle_exit_logic(self, signal: int):
         """ Submits orders to close open positions if the signal is opposite. """
         for ticker, quantity in list(self.portfolio.items()):
@@ -122,14 +116,21 @@ class AgentEnvironment:
 
     def _submit_exit_order(self, ticker, quantity):
         print(f"Agent {self.agent.agent_id}: Signal flipped. Submitting exit order for {quantity} of {ticker}.")
+        executed_trades = []
         book = self.exchange.get_book(ticker)
         if book and book.get_bids():
             exit_price = book.get_bids()[0][0]
             exit_order = Order(side=Side.SELL, price=exit_price, size=quantity, owner_id=self.agent.agent_id)
-            book.add_order(exit_order)
+            executed_trades = book.add_order(exit_order)
+
+        for trade in executed_trades:
+            print(f"    INSTANTLY FILLED: Agent {self.agent.agent_id} Taker exit trade: {trade}")
+            revenue = trade.price * trade.size * LOT_SIZE
+            # Since we placed a SELL order, we are the seller.
+            self.portfolio[trade.ticker_id] -= trade.size
+            self.cash_balance += revenue
 
     def _handle_entry_logic(self, signal: int):
-        """ Checks for opportunities to enter a new trade based on the RNN signal and a value check. """
         print(f"Agent{self.agent.agent_id}:signal={signal}")
         if signal == 0:
             return
@@ -137,7 +138,7 @@ class AgentEnvironment:
         option_type = 'CE' if signal == 1 else 'PE'
         ticker_to_trade = f"STOCK_{self.exchange.atm}_{option_type}"
         book = self.exchange.get_book(ticker_to_trade)
-        
+        executed_trades = []
         if book and book.get_asks():
             fair_value = self._calculate_fair_value(ticker_to_trade)
             best_ask_price = book.get_asks()[0][0]
@@ -149,7 +150,14 @@ class AgentEnvironment:
                                     price=best_ask_price, 
                                     size=self.order_size, 
                                     owner_id=self.agent.agent_id)
-                book.add_order(entry_order)
+                executed_trades = book.add_order(entry_order)
+            
+            for trade in executed_trades:
+                print(f"    INSTANTLY FILLED: Agent {self.agent.agent_id} Taker trade: {trade}")
+                cost = trade.price * trade.size * LOT_SIZE
+                # Since we placed a BUY order, we are the buyer.
+                self.portfolio[trade.ticker_id] += trade.size
+                self.cash_balance -= cost
 
     def _calculate_fair_value(self, ticker: str) -> float:
         """ Calculates a theoretical "fair value" for an option using the Black-Scholes model. """

@@ -2,7 +2,7 @@
 import json
 import os
 from datetime import datetime
-from config import DATA_FILE_PATH
+from config import DATA_FILE_PATH,START_CAPITAL_INSTI,START_CAPITAL_MM,START_CAPITAL_RETAIL
 
 class SimulationState:
     def __init__(self):
@@ -20,9 +20,14 @@ class SimulationState:
         now_iso = datetime.now().isoformat()
         self.data['price_timestamps'].append(now_iso)
         self.data['price_values'].append(price)
-        self.data['insti_leaderboard'] = self._create_leaderboard(insti_portfolios)
-        self.data['mm_leaderboard'] = self._create_leaderboard(mm_portfolios)
-        self.data['retail_leaderboard'] = self._create_leaderboard(retail_portfolios)
+
+        # --- THIS IS THE FIX ---
+        # Call _create_leaderboard with the specific starting capital for each agent type
+        self.data['insti_leaderboard'] = self._create_leaderboard(insti_portfolios, start_capital=START_CAPITAL_INSTI)
+        self.data['mm_leaderboard'] = self._create_leaderboard(mm_portfolios, start_capital=START_CAPITAL_MM)
+        self.data['retail_leaderboard'] = self._create_leaderboard(retail_portfolios, start_capital=START_CAPITAL_RETAIL)
+        # --- END OF FIX ---
+
         self._update_best_portfolio('best_insti_portfolio', self.data['insti_leaderboard'], now_iso)
         self._update_best_portfolio('best_mm_portfolio', self.data['mm_leaderboard'], now_iso)
         self._update_best_portfolio('best_retail_portfolio', self.data['retail_leaderboard'], now_iso)

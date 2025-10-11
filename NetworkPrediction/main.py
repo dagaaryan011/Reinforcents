@@ -5,6 +5,7 @@ from tqdm import tqdm
 from datetime import date, timedelta
 from src.tools.dashboard_updater import update_data, clear_data
 
+
 # ---  Market  ---
 from src.market.exchange import MarketExchange
 from src.market.noise import generate_daily_price_path
@@ -30,9 +31,9 @@ if __name__ == "__main__":
     print("--- Configuring Simulation ---")
     clear_data()
     # Agent Counts
-    N_INSTI_AGENTS = 10
-    N_MM_AGENTS = 100
-    N_RETAIL_AGENTS = 190
+    N_INSTI_AGENTS = 20
+    N_MM_AGENTS = 180
+    N_RETAIL_AGENTS = 100
     
     # Time and Episode Parameters
     n_episodes = 300
@@ -114,6 +115,8 @@ for i in range(n_episodes):
         current_date += timedelta(days=1)
         daily_price_path = generate_daily_price_path(current_date)
     
+    clear_data()
+
     opening_price = daily_price_path[0]
     exchange = MarketExchange(
     underlying_price=opening_price,
@@ -166,7 +169,7 @@ for i in range(n_episodes):
             # --- Run the Market Makers from this specific batch ---
             for agent in mm_agents_in_batch:
                 run_mm_step(agent, mm_env)
-            
+                # print (agent.broker.portfolio)
             # --- Periodically run Insti and Retail agents from this specific batch ---
             if (step + 1) % decision_frequency == 0:
 

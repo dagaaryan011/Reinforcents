@@ -19,38 +19,16 @@ class Broker:
         self.cash_settlement = {}
 
         self.env = None    # one common connected to the market
-    # def _calculate_portfolio_value(self):
-    #     """
-    #     Calculates the total net worth of the agent.
-    #     Value = Cash + (Stock Inventory * Stock Price) + (Value of Option Positions)
-    #     """
-    #     # 1. Start with the current cash balance
-    #     value = self.capital
-
-    #     # 2. Add the value of the underlying stock inventory
-    #     # (Assuming self.inventory is the number of shares of the underlying stock)
-    #     stock_price = self.env.exchange.underlying_price
-    #     value += self.inventory * stock_price
-
-    #     # 3. Add the value of all open option positions
-    #     for ticker, quantity in self.portfolio.items():
-    #         if quantity == 0:
-    #             continue
-            
-    #         book = self.env.exchange.get_book(ticker)
-    #         # Use the best bid to get a conservative "mark-to-market" price
-    #         if book and book.get_bids():
-    #             market_price = book.get_bids()[0][0]
-    #             value += quantity * market_price * LOT_SIZE
-        
-    #     # Store the calculated value and return it
-    #     self.portfolio_value = value
-    #     return value
+    # 
     def _calculate_portfolio_value(self):
+        """
+        Calculates the total value of the agent's portfolio.
+        Value = Cash + Marked-to-Market Value of all option positions.
+        """
+        # Start with the current cash balance.
         value = self.capital
-        stock_price = self.env.exchange.underlying_price
-        value += self.inventory * stock_price
-
+    
+        # Loop through all option positions to get their current market value.
         for ticker, quantity in self.portfolio.items():
             if quantity == 0:
                 continue
@@ -58,19 +36,21 @@ class Broker:
             book = self.env.exchange.get_book(ticker)
             if not book:
                 continue
-
-            # Long positions: value at bid (what you can sell for)
+            
+            price = 0
+            # For LONG positions, value them at the current BID price (what you can sell for).
             if quantity > 0 and book.get_bids():
                 price = book.get_bids()[0][0]
-            # Short positions: value at ask (what you can buy back for)  
+            # For SHORT positions, value them at the current ASK price (what it costs to buy back).
             elif quantity < 0 and book.get_asks():
                 price = book.get_asks()[0][0]
             else:
-                # Fallback: use mid-price or zero
+                # If there's no price, the position can't be valued at this moment.
                 continue
-
+            
+            # Add the market value of the option position to the total value.
             value += quantity * price * LOT_SIZE
-
+    
         self.portfolio_value = value
         return value
     def get_actual_state(self,ticker):
@@ -92,25 +72,35 @@ class Broker:
         return states
     
     def get_notifications(self, agent_id):
-        #TODO change the function for proper execution
+        """
+        Processes notifications for passively filled (maker) orders and correctly
+        updates the agent's capital and portfolio.
+        """
         for ticker in self.env.tickers_list: 
-            ob = self.env.exchange.get_book(ticker)
-            notifs = ob.collect_notifications_for(agent_id)
-            for notif in notifs:
-                if notif.maker_side == Side.BUY:
-                    self.portfolio[notif.ticker_id] += notif.size
-                    self.inventory += notif.size
-                    
-                    self.capital -= notif.price * notif.size
-                    
-                    #print(notif.size)
-                if notif.maker_side == Side.SELL:
-                    self.portfolio[notif.ticker_id] -= notif.size
-                    self.inventory -= notif.size
-                    
-                    self.capital += notif.price * notif.size
-                    
-                    #print(notif.size)
+            book = self.env.exchange.get_book(ticker)
+            if not book:
+                continue
+
+            notifications = book.collect_notifications_for(agent_id)
+            for trade in notifications:
+                # --- START: FIX ---
+
+                # Since this is a notification, our agent was the MAKER.
+                print(f"    CONFIRMED (Passive): Agent {agent_id} Maker trade executed: {trade}")
+                cost_or_revenue = trade.price * trade.size * LOT_SIZE # Correctly calculate full value
+
+                if trade.maker_side == Side.BUY:
+                    # Our resting BUY order was filled, so we BOUGHT
+                    print(f"      ACTION (Maker): Our resting BUY order filled: +{trade.size} {trade.ticker_id}")
+                    self.portfolio[trade.ticker_id] += trade.size
+                    self.capital -= cost_or_revenue # Apply the full value
+
+                elif trade.maker_side == Side.SELL:
+                    # Our resting SELL order was filled, so we SOLD
+                    print(f"      ACTION (Maker): Our resting SELL order filled: -{trade.size} {trade.ticker_id}")
+                    self.portfolio[trade.ticker_id] -= trade.size
+                    self.capital += cost_or_revenue                
+                        
     
     # def update_book(self, ticker, b_p, a_p, b_s, a_s, agent_id):     # TODO change logic here , will put the order , if execute , change potfolio
     #     buy_order = Order(Side.BUY, b_p, b_s, owner_id=agent_id)
