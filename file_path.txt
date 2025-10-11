@@ -1,0 +1,50 @@
+NETWORKPREDICTION/
+├── configs/
+│   └── retail_agent.json
+│
+├── data/
+│   └── models/
+│       ├── mm_agents/
+│       │   ├── actor_MM_1.pt
+│       │   ├── critic_1_MM_1.pt
+│       │   └── ... (all other .pt files)
+│       │
+│       ├── retail_agents/
+│       │    └── Models for diffrent retailer personalities
+│       │
+│       ├───Insti
+│             └─Actor and critic models 
+│
+├── src/
+│   ├── agents/
+│   │   ├── retail/
+│   │   │   ├── agent_retail.py
+│   │   │   └── agent_retail_env.py
+│   │   │── market_maker/
+│   │   │   ├── agent_mm.py
+│   │   │   ├── broker_mm.py
+│   │   │   ├── environment_mm.py
+│   │   │   └── network_mm.py
+│   │   └──Insti/
+│   │       ├──Agent.py
+│   │       ├──hybrid_env.py
+│   │       ├──model_setup.py
+│   │       └── network_insti.py
+│   │
+│   ├── market/
+│   │   ├── blackscholes.py      
+│   │   ├── exchange.py
+│   │   ├── noise.py
+│   │   ├── orderbook.py
+│   │   ├── stockprice.py
+│   │   └── trade_records.py
+│   │
+│   └── tools/
+│       ├─── functions.py
+│       ├─async_creator.py
+│       ├─dashboard_updater.py
+│       └──functions.py
+├── main.py
+|── config.py
+└── app.py
+└── requirements.txt
