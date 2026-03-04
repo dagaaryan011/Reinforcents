@@ -5,6 +5,7 @@
 **ReinforCents** is an immersive, simulation-based project that integrates finance and artificial intelligence into a functional version of a real-world stock and options market. The environment is populated by intelligent trading agents trained using multi-agent reinforcement learning (MARL) techniques.
 
 **[View the Full Documentation](https://dagaaryan011.github.io/Reinforcents)**
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/8c95dc5e-eeea-4898-9694-64e4eddd913b" />
 
 ---
 
